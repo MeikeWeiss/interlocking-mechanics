@@ -1,0 +1,175 @@
+*Heading
+** Job name: Tubular Sinus Block
+*Preprint, echo=NO, model=NO, history=NO, contact=NO
+**
+**
+PARTS
+**
+{% for bl in assembly %}
+*Part, name=block-{{bl.ID+1}}
+*Node
+{% for n in bl.nodes %}
+{{ loop.index + bl.offset['nodes'] }}, {{"%1.16E"|format(n[0]|float)}},  {{"%1.16E"|format(n[1]|float)}}, {{"%1.16E"|format(n[2]|float)}}
+{% endfor %}
+*Element, type=C3D8
+{% for el_nodes in bl.cells_glob %}
+{{loop.index + bl.offset['cells']}}, {{ el_nodes | map('string') | join(', ') }}
+{% endfor %}
+*Nset, nset=Set-{{bl.ID+1}}, generate
+ {{bl.offset['nodes']+1}}, {{bl.offset['nodes']+bl.n_nodes}}, 1
+*Elset, elset=Set-{{bl.ID+1}}, generate
+ {{bl.offset['cells']+1}}, {{bl.offset['cells']+bl.n_cells}}, 1
+** Section: Section-1
+*Solid Section, elset=Set-{{bl.ID+1}}, material=Material-1
+ ,
+*End Part
+{% endfor %}
+**
+{% for bl in assembly_frame %}
+*Part, name=frame-block-{{bl.ID+1}}
+*Node
+{% for n in bl.nodes %}
+{{ loop.index + bl.offset['nodes'] }}, {{"%1.16E"|format(n[0]|float)}},  {{"%1.16E"|format(n[1]|float)}}, {{"%1.16E"|format(n[2]|float)}}
+{% endfor %}
+*Element, type=C3D8
+{% for el_nodes in bl.cells_glob %}
+{{loop.index + bl.offset['cells']}}, {{ el_nodes | map('string') | join(', ') }}
+{% endfor %}
+*Nset, nset=Set-{{bl.ID+1}}, generate
+ {{bl.offset['nodes']+1}}, {{bl.offset['nodes']+bl.n_nodes}}, 1
+*Elset, elset=Set-{{bl.ID+1}}, generate
+ {{bl.offset['cells']+1}}, {{bl.offset['cells']+bl.n_cells}}, 1
+** Section: Section-1
+*Solid Section, elset=Set-{{bl.ID+1}}, material=Material-1
+ ,
+*End Part
+{% endfor %}
+** ###############################################################################
+** ASSEMBLY
+** ##############################################################################
+*Assembly, name=Assembly
+{% for bl in assembly %}
+*Instance, name=assembly-{{bl.ID + 1}}, part=block-{{bl.ID+1}}
+*End Instance
+{% endfor %}
+{% for bl in assembly_frame %}
+*Instance, name=frame-{{bl.ID + 1}}, part=frame-block-{{bl.ID+1}}
+*End Instance
+{% endfor %}
+**
+** Load surface ############################################
+**
+{% for bl_id in bc_n_config['bl_ids'] %}
+{% for bl_surf in bc_n_config['bl_surf'] %}
+*Elset, elset=_Surf-{{bl_surf+1}}_{{bc_n_config["el_surf"]}}_bl-{{assembly[bl_id].ID+1}}, internal, instance=assembly-{{assembly[bl_id].ID + 1}}
+{% for el_id in assembly[bl_id].surfaces[bl_surf] %}
+{{el_id+1}}, {% if loop.index % 10 == 0 %}
+
+{% endif %}
+{% endfor %}
+
+{% endfor %}
+{% endfor %}
+
+{% for bl_surf in bc_n_config["bl_surf"] %}
+*Surface, type=ELEMENT, name=Surf-{{bl_surf+1}}
+{% for bl_id in bc_n_config['bl_ids'] %}
+_Surf-{{bl_surf+1}}_{{bc_n_config["el_surf"]}}_bl-{{assembly[bl_id].ID+1}}, {{bc_n_config["el_surf"]}}
+{% endfor %}
+{% endfor %}
+**
+** Dirichlet BCs ############################################
+**
+{% for bl in assembly_frame %}
+*Nset, nset=BC_bl-{{bl.ID + 1}}, instance=frame-{{bl.ID + 1}}, generate
+ {{bl.offset["nodes"]+1}}, {{bl.offset["nodes"]+bl.n_nodes}}, 1
+{% endfor %}
+*End Assembly
+** #######################################################################################
+** #######################################################################################
+**
+*Amplitude, name=Amp-1, definition=SMOOTH STEP
+ {{bc_n_config['smooth_step'] | map('string') | join(', ')}}
+**
+** ---------------------------------------------------------------- 
+** MATERIALS
+** ---------------------------------------------------------------- 
+*Material, name=Material-1
+*Damping, alpha={{mat_config['damping_alpha']}}, beta={{mat_config['damping_beta']}}
+*Density
+ {{mat_config['density']}},
+*Elastic
+ {{mat_config['E']}}, {{mat_config['nu']}}
+**
+** ---------------------------------------------------------------- 
+** INTERACTION PROPERTIES
+** ---------------------------------------------------------------- 
+*Surface Interaction, name=IntProp-1
+*Friction
+ {{contact_config['friction']}},
+*Surface Behavior, pressure-overclosure=EXPONENTIAL
+ {{contact_config['pressure-overclosure'][0]}}, {{contact_config['pressure-overclosure'][1]}}
+**
+** ----------------------------------------------------------------
+** BOUNDARY CONDITIONS
+** ---------------------------------------------------------------- 
+** Name: BC-1 Type: Symmetry/Antisymmetry/Encastre
+*Boundary
+{% for bl in assembly_frame %}
+BC_bl-{{bl.ID + 1}}, {{bc_d_config['type']}}
+{% endfor %}
+**
+** ################################################################
+**
+** ---------------------------------------------------------------- 
+** STEP: Step-1
+** ---------------------------------------------------------------- 
+*Step, name=Step-1, nlgeom=YES
+*Dynamic, Explicit
+ , {{abq_config['t_end']}}
+*Bulk Viscosity
+ {{abq_config['bulk_viscosity'][0]}}, {{abq_config['bulk_viscosity'][1]}}
+**
+** ---------------------------------------------------------------- 
+** LOADS
+** ----------------------------------------------------------------
+{% for bl_surf in bc_n_config["bl_surf"] %}
+** Name: Load-Surf-{{bl_surf+1}}   Type: Pressure
+*Dsload, amplitude=Amp-1
+ Surf-{{bl_surf+1}}, P, {{abq_config['load_p']}}
+ {% endfor %}
+**
+** ---------------------------------------------------------------- 
+** INTERACTIONS
+** ---------------------------------------------------------------- 
+** Interaction: Int-1
+*Contact, op=NEW
+*Contact Inclusions, ALL EXTERIOR
+*Contact Property Assignment
+  ,  , IntProp-1
+**
+** ----------------------------------------------------------------
+** OUTPUT REQUESTS
+** ----------------------------------------------------------------
+*Restart, write, number interval=1, time marks=NO
+**
+** ---------------------------------------------------------------- 
+** FIELD OUTPUT: F-Output-1
+** ----------------------------------------------------------------
+*Output, field, number interval={{abq_config['out_n_intervals']}}
+*Node Output
+ A, RF, U, V
+*Element Output, directions=YES
+ S, SVAVG, MISES, MISESMAX, PRESSONLY, P, E, LE, NE
+*Contact Output
+ CDISP, CSTRESS, CFORCE
+**
+*Output, field, variable=PRESELECT
+**
+** ----------------------------------------------------------------
+** HISTORY OUTPUT: H-Output-1
+** ---------------------------------------------------------------- 
+*Output, history, variable=PRESELECT
+**
+*End Step
+

@@ -1,0 +1,11 @@
+numpy
+scipy
+jinja2
+cvxpy
+ecos
+matplotlib
+pathlib
+pyvista
+pyvista[jupyter]
+tqdm
+json_tricks
