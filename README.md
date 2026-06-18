@@ -4,6 +4,14 @@ This repository contains code developed to investigate the mechanical performanc
 
 ---
 
+## Citation
+
+If you use this code in your research, please cite the corresponding publication:
+
+> Macek, D., Weiß, M., Akpanya, R., Brepols, T., Holthusen, H., Niemeyer, A.C., 2026. *Influence of the geometry on the mechanical performance of tubular interlockings: A study of the sine block*. International Journal of Solids and Structures 339, 114148.  doi:[https://doi.org/10.1016/j.ijsolstr.2026.114148](https://doi.org/10.1016/j.ijsolstr.2026.114148).
+
+---
+
 ## Requirements
 
 All required Python packages are listed in the repository-level file:
@@ -47,11 +55,3 @@ The scripts rely on the implementation contained in the `src/` directory and wri
 ## Reproducibility
 
 The scripts are designed to allow full reproduction of the numerical investigations and figures reported in the associated publications.
-
----
-
-## Citation
-
-If you use this code in your research, please cite the corresponding publication:
-
-> Macek, D., Weiß, M., Akpanya, R., Brepols, T., Holthusen, H. & Niemeyer, A.C. (2026). *Influence of the Geometry on the Mechanical Performance of Tubular Interlockings: A Study of the Sine Block*. Manuscript submitted for publication.
