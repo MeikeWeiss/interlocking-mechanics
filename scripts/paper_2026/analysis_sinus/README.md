@@ -41,7 +41,7 @@ The outputs include contact pressure fields, equilibrium checks, and aggregated 
 ## Run a Single MBD Simulation
 
 ```bash
-python -m scripts.paper_2026.analysis_sinus.mbd.py
+python -m scripts.paper_2026.analysis_sinus.mbd
 ```
 
 This script:
@@ -65,7 +65,7 @@ can be modified at the top of `mbd.py`.
 ## Run Multiple Boundary Value Problems
 
 ```bash
-python -m scripts.paper_2026.analysis_sinus.mbd_bvp.py
+python -m scripts.paper_2026.analysis_sinus.mbd_bvp
 ```
 
 This script evaluates different **BVP scenarios**:
@@ -87,7 +87,7 @@ It computes contact pressure distributions and prints summary measures such as:
 ## Run Parameter Study (Parallel)
 
 ```bash
-python -m scripts.paper_2026.analysis.mbd_parameter_para.py
+python -m scripts.paper_2026.analysis_sinus.mbd_parameter_para
 ```
 
 This performs a large **parameter sweep** over:
@@ -111,7 +111,7 @@ outputs/paper/analysis/
 ## Post-Processing Results
 
 ```bash
-python -m scripts.paper_2026.analysis_sinus.post_results.py
+python -m scripts.paper_2026.analysis_sinus.post_results
 ```
 
 This script:
@@ -125,7 +125,7 @@ This script:
 ## Generate Abaqus Input Files
 
 ```bash
-python -m scripts.paper_2026.analysis_sinus.abq.py
+python -m scripts.paper_2026.analysis_sinus.abq
 ```
 
 This script generates **Abaqus `.inp` files** for quasi-static FEM simulations of the block assemblies.  

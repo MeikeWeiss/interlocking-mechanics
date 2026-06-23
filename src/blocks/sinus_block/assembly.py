@@ -18,7 +18,7 @@ Reference:
 
 import numpy as np
 
-from src.blocks.block_class import Block
+from src.blocks.sinus_block.block_class import Block
 from src.engine.util import get_R_and_R6
 
 
@@ -95,7 +95,7 @@ def create_tube(block, n_block_layer ):
                 offset['cells_2D'] += bl.n_cells_2D
 
         offset['ID'] += block['n']
-        
+  
     return assembly, offset
 
 

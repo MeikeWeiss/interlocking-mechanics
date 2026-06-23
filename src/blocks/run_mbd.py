@@ -34,7 +34,7 @@ def analyse_contact_pressure(block_config,
                              info):
     
     blocks = get_blocks(block_config)
-    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type])
+    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type],bvp_type)
     
     assembly_all = get_assembly( blocks, assembly_config, block_config )
     
@@ -69,7 +69,7 @@ def test_interlocking(block_config,
                       info):
     
     blocks = get_blocks(block_config)
-    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type])
+    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type],bvp_type)
     
     assembly_all = get_assembly( blocks, assembly_config, block_config )
 
@@ -90,17 +90,16 @@ def test_interlocking(block_config,
 ############################################################################
 # prepare blocks
 ############################################################################
-def setup_blocks(blocks, group_faces, bvp_config):
+def setup_blocks(blocks, group_faces, bvp_config, bvp_type):
 
     for block_type, config in bvp_config.items():
 
         # compute data needed for the computation: normal vectors, unit forces, etc.
-        block = get_mbd_data(blocks[block_type])
+        if bvp_type != 'ceiling':
+            block = get_mbd_data(blocks[block_type])
         
         # create groups of surface faces
-
         if 'surf_filter' not in blocks[block_type]:
-            
             block = group_faces( blocks[block_type] )
             
         block = categorize_face_groups(

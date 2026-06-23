@@ -3,7 +3,7 @@ import pyvista as pv
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-def plot_assembly_fc(assembly, lam,
+def plot_assembly_fc(assembly, lam, contact_faces,
                      save=False, path='test.png',
                      cpos=None):
 
@@ -18,13 +18,11 @@ def plot_assembly_fc(assembly, lam,
 
     # Plot
     plotter = pv.Plotter()
-
-    n_surf = 28
     
     for bl in assembly:
-
+        n_contact = len(contact_faces)
         plot_fc_surfaces(plotter, bl.nodes, bl.cells_2D, bl.cells_2D_arr,
-                         lam[bl.ID*n_surf:bl.ID*n_surf+n_surf], cmap)
+                         lam[bl.ID*n_contact:bl.ID*n_contact+n_contact], contact_faces,cmap)
 
 
     # Add small coordinate axes in corner
@@ -54,9 +52,6 @@ def plot_assembly_fc(assembly, lam,
 
     else:
         plotter.show()
-    
-    # plotter.show()
-
 
     return
 
@@ -64,17 +59,19 @@ def plot_assembly_fc(assembly, lam,
 def plot_fc_surfaces(plotter,
                      points, triangles, cells,
                      fc, # 'contact pressure' (lambda)
+                     contact_faces,
                      cmap,
                      ):
     
     # Create PyVista mesh
-    mesh = pv.UnstructuredGrid(cells[6*4:], np.full(len(triangles[6:]), pv.CellType.TRIANGLE), points)
+    mesh = pv.PolyData(points, cells)
+    # mesh = pv.UnstructuredGrid(cells[6*4:], np.full(len(triangles[6:]), pv.CellType.TRIANGLE), points)
 
-    mesh.cell_data['contact force'] = fc
+    fc_full = np.zeros(mesh.n_cells)
+    fc_full[contact_faces] = fc
+
+    mesh.cell_data['contact force'] = fc_full
     
-    # plotter.add_mesh(mesh, scalars='fc',
-    #                  cmap=cmap, show_edges=False,
-    #                  color='skyblue', opacity=1.0)
     plotter.add_mesh(mesh, scalars='contact force', cmap=cmap,
                      show_edges=False, color='skyblue',
                      opacity=1.0, lighting=False)
@@ -152,7 +149,7 @@ def plot_block_Fc(points, triangles, cells,
 
 def plot_block_surfaces(points, triangles, cells,
                         centroid, face_centers,
-                        face_normals, r, M,
+                        face_normals,
                         ids=False,
                         save=False, path='test.png'):
 

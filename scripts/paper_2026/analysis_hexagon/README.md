@@ -36,7 +36,7 @@ The outputs include contact pressure fields, equilibrium checks, and aggregated 
 ## Run a Single MBD Simulation
 
 ```bash
-python -m scripts.paper_2026.analysis_hexagon.mbd.py
+python -m scripts.paper_2026.analysis_hexagon.mbd
 ```
 
 This script:
@@ -59,7 +59,7 @@ can be modified at the top of `mbd.py`.
 ## Run Multiple Boundary Value Problems
 
 ```bash
-python -m scripts.paper_2026.analysis_hexagon.mbd_bvp.py
+python -m scripts.paper_2026.analysis_hexagon.mbd_bvp
 ```
 
 This script evaluates different **BVP scenarios**:
@@ -81,7 +81,7 @@ It computes contact pressure distributions and prints summary measures such as:
 ## Generate Abaqus Input Files
 
 ```bash
-python -m scripts.paper_2026.analysis.abq.py
+python -m scripts.paper_2026.analysis_hexagon.abq
 ```
 
 This script generates **Abaqus `.inp` files** for quasi-static FEM simulations of the block assemblies.  

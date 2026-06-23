@@ -327,7 +327,8 @@ def plot_assembly_and_frame(assembly, assembly_frame, plt_conf):
         plot_block(
             plotter,
             bl.nodes,
-            len(bl.cells), bl.cells_arr,
+            #len(bl.cells), bl.cells_arr,
+            bl.n_cells, bl.cells_2D,
             color=plt_conf['color'], #'orange'
             line_width=plt_conf['line_width'],
         )
@@ -659,10 +660,14 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
 
     offset_contact_faces = 0
     for bl in assembly:
-
         cells_idx = bl.data['face_groups']['contact_faces']
         n_surf = len(cells_idx)
-        nodes_idx = [j for i in cells_idx for j in range(i*5, i*5 + 5)]
+        if bl.data['cells']['3D'][0][0]==8:
+            nodes_idx = [j for i in cells_idx for j in range(i*5, i*5 + 5)]
+        elif len(bl.data['cells']['3D'][0])==3:
+            nodes_idx = [j for i in cells_idx for j in range(i*4, i*4 + 4)]
+        else:
+            raise ValueError("Unsupported cell type. Expected 3 or 4 nodes per cell.")
         cells_2D_arr = bl.data['surface'].faces[nodes_idx]
         
         plot_quantity_distr(
@@ -699,7 +704,13 @@ def plot_quantity_distr(plotter,
                         ):
     
     # Create PyVista mesh
-    mesh = pv.UnstructuredGrid(cells_arr, np.full(n_cells, pv.CellType.QUAD), points)
+    if cells_arr[0] == 4:
+        mesh = pv.UnstructuredGrid(cells_arr, np.full(n_cells, pv.CellType.QUAD), points)
+    elif cells_arr[0] == 3: 
+        mesh = pv.UnstructuredGrid(cells_arr, np.full(n_cells, pv.CellType.TRIANGLE), points)
+    else:
+        raise ValueError(f"Unsupported cell type with {cells_arr[0]} nodes. "
+                         "Expected 3 (triangles) or 4 (quads).")
     
     mesh.cell_data[quantity_name] = quantity
     

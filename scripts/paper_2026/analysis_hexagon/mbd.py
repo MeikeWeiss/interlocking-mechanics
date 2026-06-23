@@ -28,9 +28,9 @@ bvp_type = 'tunnel'
 
 ##### plot config ################
 plot_config['assembly_all'] = 'assembly'
-plot_config['show'] = True
-plot_config['save'] = False
-plot_config['html'] = False
+plot_config['show'] = False
+plot_config['save'] = True
+plot_config['html'] = True
 plot_config['views'] = ['pers'] # None, 'xy', 'yx',['xy', ]
 plot_config['parallel'] = False
 plot_config['clim'] = None # [0., 1.5], None

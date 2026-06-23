@@ -15,7 +15,7 @@ Wenzheng Xu, Xiaoshan Lin, and Yi Min Xie. A novel non-planar interlocking eleme
 
 import numpy as np
 
-from src.blocks.block_class import Block
+from src.blocks.sinus_block.block_class import Block
 from src.engine.util import get_M_and_M6
 
 def get_assembly(blocks, assembly_config, block_config):

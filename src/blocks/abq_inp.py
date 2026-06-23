@@ -32,7 +32,7 @@ def generate_abq_input(block_config,
 
     # create block according to the configurations
     blocks = get_blocks(block_config)
-    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type])
+    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type],bvp_type)
 
     # create assembly from the block
     assembly_all = get_assembly( blocks, assembly_config, block_config )

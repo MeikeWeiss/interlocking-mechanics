@@ -244,7 +244,7 @@ def extract_block_surface( all_points, n_cells, cells_arr ):
     mesh = pv.UnstructuredGrid(cells_arr, cell_types, all_points)
 
     # Extract the outer surface
-    surface = mesh.extract_surface(algorithm="dataset_surface")
+    surface = mesh.extract_surface()
     
     return surface
 

@@ -15,18 +15,18 @@ Reference:
 import matplotlib.pyplot as plt
 from scipy.interpolate import make_interp_spline
 
-from scripts.analysis_sinus.config import *
-from src.blocks.post_mbd import analyse_results
+from scripts.paper_2026.analysis_sinus.config import *
+from src.blocks.sinus_block.post_mbd import analyse_results
 
 #################################################################################
 # Change parameters only in this function
 #################################################################################
 def run():
 
-    sh = [0.5,] # sinus or cosinus
+    sh = [0.,] # sinus or cosinus
     show = True
     save = False
-    out_config['out_dir'] = './outputs/paper2026/analysis/'
+    out_config['out_dir'] = './outputs/paper2026/'
     plot_path = f"{out_config['out_dir']}test.png" # mbd_analysis_sinus.png
     plot_measure(
         'p_max_bl_avg',
@@ -44,8 +44,9 @@ def run():
 def plot_measure(measure_type, sh, show, save, plot_path):
     
     amplitude = [10.,15.,20.,25.]
+    amplitude = [10.]
     shift = sh
-    frequency = [1.0,1.5,2.0]
+    frequency = [1.0,]
     #frequency = [1.0,1.5]
     N = [2,3,4,5,6] # number of blocks per layer
     #N = [2,] # number of blocks per layer
@@ -165,11 +166,11 @@ def get_snaps_file_path(n, t, sh, fr, amp, out_config):
 
 def analyse_results_test( ):
 
-    amp = 15.
+    amp = 20.
     sh = 0.
-    fr = 1. 
+    fr = 1.5 
     n = 4 # number of blocks per layer
-    t = 30. # thickness
+    t = 40. # thickness
 
     block_config['t'] = t
     block_config['n'] = n

@@ -601,6 +601,7 @@ def wang_interlocking_test(B, n_fixed=1, dof_per_body=6, solver="CLARABEL", tol=
     """
 
     m, n = B.shape
+    
     fixed_dofs = n_fixed * dof_per_body
 
     Y = cp.Variable(n)
@@ -657,6 +658,7 @@ def mechanism_test(G, f_ext, n_fixed=1, dof_per_body=6, tol=1e-6):
     """
 
     m, n = G.shape
+
     fixed_dofs = n_fixed * dof_per_body
 
     dq = cp.Variable(m)

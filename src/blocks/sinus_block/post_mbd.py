@@ -15,7 +15,7 @@ import numpy as np
 
 from src.engine.plots import plot_assembly_quantity
 from src.engine.util import makeDirIfNotExists, load_from_json
-from src.blocks.block_class import Block
+from src.blocks.sinus_block.block_class import Block
 from src.blocks.run_mbd import setup_blocks
 
 
@@ -141,7 +141,7 @@ def plot_snaps(snaps_file,
     
     # create blocks and set them up for mbd simulation
     blocks = get_blocks(block_config)
-    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type])
+    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type],bvp_type)
 
     # initialize block
     bl = Block(
@@ -151,6 +151,8 @@ def plot_snaps(snaps_file,
         0.,
         block_config['rot_axis']
     )
+
+   
     
     for s in range(n_snaps):
 
