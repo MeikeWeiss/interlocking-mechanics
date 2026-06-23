@@ -327,8 +327,7 @@ def plot_assembly_and_frame(assembly, assembly_frame, plt_conf):
         plot_block(
             plotter,
             bl.nodes,
-            #len(bl.cells), bl.cells_arr,
-            bl.n_cells, bl.cells_2D,
+            len(bl.cells), bl.cells_arr,
             color=plt_conf['color'], #'orange'
             line_width=plt_conf['line_width'],
         )
