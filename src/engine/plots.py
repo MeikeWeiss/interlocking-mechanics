@@ -664,6 +664,9 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
     for bl in assembly:
         cells_idx = bl.face_groups['contact_faces']
         n_surf = len(cells_idx)
+        if n_surf == 0:
+            # e.g. frame blocks of planar assemblies without contact to the analysed blocks
+            continue
         # surface faces are stored as [n, id_1, ..., id_n]: quads (sine,
         # hexagon blocks) or triangles (planar blocks)
         faces = bl.data['surface'].faces
