@@ -9,16 +9,36 @@ Getestet mit kleinen Modellen (ohne Plots) in einer separaten Python-3.10-Umgebu
 | Punkt | Status |
 |---|---|
 | 1. Shared Code / Sinus kaputt | **behoben**: `src/blocks/run_mbd.py` wieder mit Release-Semantik (Setup der Referenzblöcke vor der Assemblierung), planare Logik in `src/blocks/planar_block/run_mbd_planar.py`; `analysis_sinus/mbd.py` = Release-Stand, In/Out-Variante nach `scripts/sinus_inout/mbd_inout.py`; `extract_surface(algorithm="dataset_surface")` explizit (Face-Reihenfolge unabhängig von pyvista-Version); kaputte Importpfade in `figures/*.py`, `post_snaps.py`, `mbd_bvp_layer.py` korrigiert |
-| 2. Oktaeder Phantom-Auflager | offen (Schritt 2) |
+| 2. Oktaeder Phantom-Auflager | **behoben** (Option `support='frame'`): Assembly geprüft und korrekt (keine Durchdringung, Mittelebene zu 100 % gefüllt, Seitenflächen inhärent nur zur Hälfte im Kontakt). Neues Kontaktmodell über exakten Dreiecksschnitt (`src/blocks/planar_block/contacts.py`), funktioniert auch bei nicht passender Triangulierung |
 | 3. `wall_right` crasht | **behoben** (Ausdehnung der Assembly aus der Geometrie) |
 | 4. `n_fixed=8` hart codiert | **behoben**: Anzahl Frame-Blöcke aus der Assembly (Sinus n=4: weiterhin 8), planar `n_fixed=0`, `Y[-0:]`-Falle abgefangen |
 | 5. Normalen `brick`/`brick_inter` | **behoben**: Normalen nach außen, `unit_forces`-Überschreibungen entfernt, Block-Arrays kopiert, Ebenen aus z-Ausdehnung des Blocks. Ergebnisse identisch zum vorherigen Stand |
 | 6. Kleinere Fehler | **behoben**: Ordnername in `post_results.py`, NaN in planaren Kennzahlen, `out_dir_override`, `requirements.txt`, `errno`, `trimesh`-Import, `centroid`-Tupel, `octahedron_param` |
-| Methodische Punkte | offen (zur Diskussion) |
+| 7. Interlocking-Test (neu gefunden) | **für planar behoben** (`lp_method='cone_mechanism'`), Sinus/Paper unverändert — siehe unten |
+| Methodische Punkte | Zielfunktion als Option `objective='pressure'` verfügbar (Default weiterhin wie im Paper); A_eff/p_eff-Definition offen |
 
-Hinweis: Der planare Interlocking-Test (jetzt `n_fixed=0`) findet für `versatile`/`p4` 3×3, ref 0
-eine Bewegung erster Ordnung (Anheben mit Verkippen, s = 0). Ob sie echt ist oder an der impliziten
-Rahmen-Darstellung (ungepaarte Flächen) liegt, gehört zu Schritt 2.
+### 7. Interlocking-Test (in Schritt 2 gefunden)
+
+- **`wang_interlocking_test` (Grundlage von `mechanism_test`) übersieht Bewegungen ohne
+  Separation.** Maximiert wird nur der Sicherheitsabstand s mit Gᵀδq ≥ s. Gibt es nur Bewegungen mit
+  s = 0 (z.B. Gleiten in beide Richtungen), ist auch δq = 0 optimal; der Innere-Punkte-Löser liefert
+  den Mittelpunkt der optimalen Menge, bei bidirektionalen Bewegungen δq = 0. Beispiel: einfache
+  Ziegel (`brick`, `p1_brick`) als Decke werden als „interlocked“ gemeldet, obwohl jeder Ziegel
+  senkrecht herausgleiten kann.
+- **Gl. (11) im Paper ist so wie formuliert degeneriert**: max 1ᵀs mit −s ≤ δq ≤ s, 0 ≤ s ≤ 1 hat
+  für δq = 0 die zulässige Lösung s = 1 (z* = 6·N_b immer). Gemeint ist wohl max ‖δq‖₁ — nicht
+  konvex. (Der Code nutzt stattdessen Wang 2018.)
+- **Neu: `cone_interlocking_test`** (vollständiger Test erster Ordnung): Nullraum von Gᵀ auf den
+  freien DOFs (Gleitmoden) + LP max 1ᵀ(Gᵀδq) mit 0 ≤ Gᵀδq ≤ 1 (öffnende Bewegungen). Für planare
+  Assemblies werden die Bedingungen an den **Eckpunkten der Kontaktpolygone** gestellt → exakt
+  und unabhängig von der Verfeinerung (vorher: bei ref 0/1 Schein-Mechanismen, z.B. versatile 3×3
+  ref 0, Oktaeder ref 1 mit Drehung um z).
+- Ergebnisse (ref 0–2, implizit und Rahmen): versatile/bisquare/brick_inter/Oktaeder verzahnt,
+  einfache Ziegel freier Mechanismus; bei der Wand wird das Abheben der obersten Reihe gefunden
+  („suppressed“ durch die Last).
+- Sinus/Hexagon-Skripte nutzen weiterhin `mechanism_test` (Reproduzierbarkeit); für n = 4 lautet
+  das Ergebnis „interlocked“. **Zu prüfen:** ob die Interlocking-Aussagen im Paper mit dem
+  vollständigen Test bestätigt werden.
 
 ## Kurzfazit
 
@@ -149,7 +169,8 @@ Lokale **Streamlit-App**:
 
 ## Plan
 
-1. Branch: Sinus-Pfad wieder lauffähig/reproduzierbar, `wall_right`, `n_fixed`, Normalen,
-   Benennung, NaN fixen + Test-Durchlauf.
-2. `run_planar(params)` + explizite Randbedingungen (Oktaeder).
-3. Streamlit-App.
+1. ~~Sinus-Pfad wieder lauffähig/reproduzierbar, `wall_right`, `n_fixed`, Normalen,
+   Benennung, NaN fixen + Test-Durchlauf.~~ erledigt
+2. ~~Explizite Randbedingungen (Oktaeder), Kontaktmodell für nicht passende Triangulierungen,
+   Interlocking-Test.~~ erledigt
+3. Streamlit-App (Grundlage: `scripts/planar/mbd_planar.run(...)`, liefert `info`).

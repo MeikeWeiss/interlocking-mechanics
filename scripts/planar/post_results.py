@@ -5,10 +5,11 @@ from scripts.planar.mbd_planar import get_run_name
 import numpy as np
 import pandas as pd
 
-def get_snaps_file_path(type, group, refinement, n, m, h, out_config, bvp='ceiling'):
+def get_snaps_file_path(type, group, refinement, n, m, h, out_config, bvp='ceiling',
+                        support='implicit', objective='force'):
 
     # same folder name as in scripts/planar/mbd_planar.py
-    out_config['name'] = get_run_name(type, group, bvp, refinement, n, m, h)
+    out_config['name'] = get_run_name(type, group, bvp, refinement, n, m, h, support, objective)
     return f"{out_config['out_dir']}{out_config['name']}/snaps.txt"
 
 
@@ -119,6 +120,8 @@ def analyse_results_batch(h_list,
                           output_filename='results.xlsx', 
                           out_dir='./outputs/planar/',
                           bvp='ceiling',
+                          support='implicit',
+                          objective='force',
                           show=True):
     
     out_config['out_dir'] = out_dir
@@ -133,7 +136,8 @@ def analyse_results_batch(h_list,
             'type': type,
             'h': h
         })
-        snaps_file = get_snaps_file_path(type, group, refinement, n, m, h, out_config, bvp)
+        snaps_file = get_snaps_file_path(type, group, refinement, n, m, h, out_config, bvp,
+                                         support, objective)
         
         try:
             snaps = np.loadtxt(snaps_file)

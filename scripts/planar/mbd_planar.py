@@ -13,7 +13,7 @@ from scripts.planar.config import (
     new_info,
 )
 from src.blocks.planar_block.run_mbd_planar import analyse_contact_pressure, test_interlocking
-from src.engine.util import makeDirIfNotExists
+from src.engine.util import makeDirIfNotExists, save_to_json
 
 
 # ============================================================================
@@ -34,20 +34,29 @@ PARAMETRIZED_BLOCKS = ('versatile_param', 'bisquare_param', 'irr_octahedron')
 # Simulation functions
 # ============================================================================
 
-def get_run_name(block_type, group_name, bvp, ref, n_blocks, m_blocks, h_value=None):
+def get_run_name(block_type, group_name, bvp, ref, n_blocks, m_blocks, h_value=None,
+                 support='implicit', objective='force'):
     '''name of the output folder of a run'''
     name = f"{block_type}_{group_name}_{bvp}_{ref}_{n_blocks}x{m_blocks}"
     if h_value is not None and block_type in PARAMETRIZED_BLOCKS:
         name += f"_h{h_value:.3f}"
+    if support != 'implicit':
+        name += f"_{support}"
+    if objective != 'force':
+        name += f"_{objective}"
     return name
 
 
 def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=None,
-        ref=None, bvp='ceiling', out_dir_override=None, mode='force_equilibrium'):
+        ref=None, bvp='ceiling', out_dir_override=None, mode='force_equilibrium',
+        support=None, objective=None, contact_method=None):
     """
     Run a single simulation. Arguments that are None are taken from config.py.
 
-    mode: 'force_equilibrium' or 'interlocking_test'
+    mode:           'force_equilibrium' or 'interlocking_test'
+    support:        'implicit' or 'frame' (see config.py)
+    objective:      'force' or 'pressure'
+    contact_method: 'intersection' or 'matching'
     """
     # local copies: the configuration in config.py is not modified
     b_conf = copy.deepcopy(block_config)
@@ -70,9 +79,16 @@ def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=
         a_conf['n'] = n_blocks
     if m_blocks is not None:
         a_conf['m'] = m_blocks
+    if support is not None:
+        a_conf['support'] = support
+    if objective is not None:
+        a_conf['objective'] = objective
+    if contact_method is not None:
+        a_conf['contact_method'] = contact_method
 
     name = get_run_name(b_conf['type'], a_conf['group'], bvp, b_conf['refinement'],
-                        a_conf['n'], a_conf['m'], b_conf['h'])
+                        a_conf['n'], a_conf['m'], b_conf['h'],
+                        a_conf.get('support', 'implicit'), a_conf.get('objective', 'force'))
 
     if out_dir_override:
         o_conf['out_dir'] = out_dir_override
@@ -93,6 +109,7 @@ def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=
                                  p_conf, o_conf, info)
     elif mode == 'interlocking_test':
         test_interlocking(b_conf, a_conf, blocks_bvp_config[bvp], bvp, info)
+        save_to_json(info, f"{out_dir}interlocking.json")
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
@@ -122,15 +139,16 @@ if __name__ == '__main__':
     # 1. Nicht-parametrisierter Block (kein h)
     #run(block_type='versatile', group_name='p4', n_blocks=4, m_blocks=4)
 
-    #run(block_type='octahedron', group_name='octa', n_blocks=4, m_blocks=4, ref=4)
+    # Oktaeder: Seitenflächen nur teilweise im Kontakt -> Rahmen als Auflager
+    #run(block_type='octahedron', group_name='octa', n_blocks=6, m_blocks=6, ref=3, support='frame')
 
     # 2. Parametrisierter Block (mit h)
-    #run(block_type='irr_octahedron', h_value=0.7, group_name='octa', n_blocks=6, m_blocks=6,ref=4)
+    #run(block_type='irr_octahedron', h_value=0.7, group_name='irr_octa', n_blocks=6, m_blocks=6, ref=4, support='frame')
 
     #run(block_type='versatile_param', h_value=np.sqrt(2)/2, group_name='p4', n_blocks=6, m_blocks=6,ref=4)
 
     # 3. H-Sweep für parametrisierte Blöcke
-    #h_sweep(block_type='irr_octahedron', group_name='irr_octa', n_blocks=6, m_blocks=6, h_values=h_list, ref=4)
+    #h_sweep(block_type='irr_octahedron', group_name='irr_octa', n_blocks=6, m_blocks=6, h_values=h_list, ref=4, support='frame')
 
     # 4. H-Sweep für Versatile
     #h_sweep(

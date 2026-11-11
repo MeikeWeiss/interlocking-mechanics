@@ -28,7 +28,20 @@ assembly_config = {
     'n': 4, 
     'm': 4,
     'group': 'p1',
-    'lp_method': 'mechanism_test', # 'dof', 'norm2', 'wang2018', 'mechanism_test'
+    # interlocking test: 'cone_mechanism' (complete first-order test + mechanism
+    # classification), 'cone', or the older 'mechanism_test', 'wang2018', 'dof', 'norm2'
+    # ('mechanism_test'/'wang2018' miss motions without separation, e.g. sliding)
+    'lp_method': 'cone_mechanism',
+    # contacts: 'intersection' (exact intersection of the triangles, works for
+    # non-matching triangulations) or 'matching' (original face matching)
+    'contact_method': 'intersection',
+    # supports: 'implicit' (faces without contact are rigid supports) or
+    # 'frame' (frame blocks are fixed, other faces without contact are free;
+    # required e.g. for octahedra, whose side faces are only partially in contact)
+    'support': 'implicit',
+    'frame_blocks': 'boundary', # 'boundary' or list of block indices
+    # 'force': min sum lambda^2 (paper), 'pressure': min integral p^2 (mesh independent)
+    'objective': 'force',
 }
 
 
@@ -65,7 +78,7 @@ plot_config  = {
     'views': ['pers'], # None, 'xy', 'yx',['xy', ]
     'parallel': False, # parallel projection (perspective): True
     'clim': None, # color map limits: None, [vmin, vmax]
-    'assembly_all': 'assembly', # which part of the assembly to plot
+    'assembly_all': 'together', # which part of the assembly to plot: 'together' (incl. frame), 'assembly'
     'zoom': 1.0,
 }
 

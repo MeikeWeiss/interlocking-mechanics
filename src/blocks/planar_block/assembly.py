@@ -294,6 +294,7 @@ class Block():
         self.nodes = data['all_points'] @ Rz.T + trans
         self.surface_nodes = self.nodes
         self.face_centers = data['face_centers'] @ Rz.T + trans
+        self.centroid = np.asarray(data['centroid']) @ Rz.T + trans
         self.face_normals = data['face_normals'] @ Rz.T
         self.unit_forces = data['unit_forces'] @ Rz.T
         self.unit_momentum = data['unit_momentum'] @ Rz.T

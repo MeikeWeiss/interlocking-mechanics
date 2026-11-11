@@ -121,6 +121,20 @@ def check_kinematic_feasibility( assembly, info, lp_method='dof', n_fixed=8 ):
     ### build contact Jacobian ###
     G, f_ext, _, _, _, _ = assemble_J_fext(assembly, t, show_J=False)
 
+    return kinematic_feasibility(G, f_ext, lp_method, n_fixed)
+
+
+def kinematic_feasibility(G, f_ext, lp_method='dof', n_fixed=8):
+    '''
+    Kinematic feasibility for a given contact Jacobian G and load vector f_ext.
+    The last n_fixed bodies are fixed.
+
+    Returns a dict with 'motion' (bool or None), 'dq' and, for
+    'mechanism_test', 'gamma' (min, max) of the mechanism test.
+    '''
+
+    result = {'lp_method': lp_method, 'n_fixed': n_fixed, 'gamma': None}
+
     ### check mobility ###
     if lp_method == 'dof':
         motion, dq = solve_lp_dof(G.T, n_fixed)
@@ -128,6 +142,15 @@ def check_kinematic_feasibility( assembly, info, lp_method='dof', n_fixed=8 ):
         motion, dq, s, status = wang_interlocking_test(G.T, n_fixed)
     elif lp_method == 'norm2':
         motion, dq, status = solve_lp_norm2(G.T, n_fixed)
+    elif lp_method in ('cone', 'cone_mechanism'):
+        motion, dq, cone_info, status = cone_interlocking_test(G.T, n_fixed)
+        result.update(cone_info)
+        if dq is None:
+            print(f"Interlocking test failed (solver status: {status})")
+        elif not motion:
+            print("No mechanism (interlocked system)")
+        elif lp_method == 'cone_mechanism':
+            result['gamma'] = mechanism_test(G, f_ext, n_fixed)
     elif lp_method == 'mechanism_test':
         motion, dq, s, status = wang_interlocking_test(G.T, n_fixed)
         if dq is None:
@@ -135,11 +158,17 @@ def check_kinematic_feasibility( assembly, info, lp_method='dof', n_fixed=8 ):
         elif np.linalg.norm(dq) < 1e-9:
             print("No mechanism (interlocked system)")
         else:
-            mechanism_test(G, f_ext, n_fixed)
+            result['gamma'] = mechanism_test(G, f_ext, n_fixed)
     else:
         raise ValueError(f"Unknown lp_method: {lp_method}")
-    
-    return
+
+    if lp_method in ('dof', 'cone', 'cone_mechanism'):
+        result['motion'] = bool(motion)  # dq is None if there is no motion (dof)
+    else:
+        result['motion'] = None if dq is None else bool(np.linalg.norm(dq) >= 1e-9)
+    result['dq'] = dq
+
+    return result
 
 ############################################################################
 # solver
@@ -649,6 +678,61 @@ def wang_interlocking_test(B, n_fixed=1, dof_per_body=6, solver="CLARABEL", tol=
     print(f"s: {s.value}")
     
     return motion_exists, Y.value, s.value, prob.status
+
+
+def cone_interlocking_test(B, n_fixed=1, dof_per_body=6, tol=1e-8):
+    """
+    Complete first-order interlocking test for the cone of admissible motions
+
+        K = { dq : B dq >= 0, dq_fixed = 0 },   B = G^T.
+
+    K = {0} (interlocked to first order) if and only if
+      1. B restricted to the free DOFs has a trivial nullspace (no motion with
+         zero normal velocity at all contacts, e.g. bidirectional sliding), and
+      2. the LP  max 1^T (B dq)  s.t.  0 <= B dq <= 1, -1 <= dq <= 1
+         has the optimal value 0 (no motion that opens a contact).
+
+    Note: the margin formulation (wang_interlocking_test) misses motions
+    without separation, and the LP max 1^T s, -s <= dq <= s, 0 <= s <= 1 is
+    degenerate (s = 1 is feasible for dq = 0).
+
+    Returns motion_exists, dq, info (dict: nullity, lp_value), status
+    """
+    B = sp.csr_matrix(B)
+    m, n = B.shape
+    n_free = n - dof_per_body * max(n_fixed, 0)
+    Bf = B[:, :n_free]
+
+    # 1. nullspace of the free part (via the small Gram matrix)
+    gram = (Bf.T @ Bf).toarray()
+    w, V = np.linalg.eigh(gram)
+    sv = np.sqrt(np.clip(w, 0., None))
+    null = sv <= tol * max(sv.max(), 1.)
+    nullity = int(null.sum())
+
+    # 2. motions that open contacts
+    x = cp.Variable(n_free)
+    g = Bf @ x
+    prob = cp.Problem(cp.Maximize(cp.sum(g)), [g >= 0, g <= 1, x <= 1, x >= -1])
+    prob.solve(solver=cp.CLARABEL)
+    if prob.status not in ["optimal", "optimal_inaccurate"]:
+        return False, None, {'nullity': nullity, 'lp_value': None}, prob.status
+    lp_value = float(prob.value)
+
+    scale = max(np.abs(Bf).max(), 1.)
+    opening = lp_value > tol * scale * m
+
+    dq = np.zeros(n)
+    if opening:
+        dq[:n_free] = x.value
+    elif nullity:
+        dq[:n_free] = V[:, np.argmax(null)]
+
+    motion_exists = bool(nullity > 0 or opening)
+    print(f"motion exists: {motion_exists}")
+    print(f"sliding modes (nullity): {nullity}, opening motion LP value: {lp_value}")
+
+    return motion_exists, dq, {'nullity': nullity, 'lp_value': lp_value}, prob.status
 
 
 def mechanism_test(G, f_ext, n_fixed=1, dof_per_body=6, tol=1e-6):
