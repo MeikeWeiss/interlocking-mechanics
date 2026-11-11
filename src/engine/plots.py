@@ -664,6 +664,13 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
     for bl in assembly:
         cells_idx = bl.face_groups['contact_faces']
         n_surf = len(cells_idx)
+
+        # optional: faces without contact (grey, frame blocks in color_frame)
+        # and the edges of the block, so that the blocks and the gaps between
+        # them stay visible when only parts of the faces are in contact
+        if plt_conf.get('show_free_faces', False):
+            plot_block_free_faces(plotter, bl, plt_conf)
+
         if n_surf == 0:
             # e.g. frame blocks of planar assemblies without contact to the analysed blocks
             continue
@@ -696,6 +703,34 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
     plotter.close()   # Important: closes rendering window and releases buffers
     del plotter
     
+    return
+
+
+def plot_block_free_faces(plotter, bl, plt_conf):
+    '''faces of a block without contact and the edges of the block'''
+
+    faces = np.asarray(bl.data['surface'].faces)
+    stride = faces[0] + 1
+    n_faces = len(faces) // stride
+    contact = set(np.asarray(bl.face_groups['contact_faces']).tolist())
+    free = [i for i in range(n_faces) if i not in contact]
+
+    is_frame = getattr(bl, 'is_frame', False)
+    color = plt_conf.get('color_frame', 'lightgrey') if is_frame else plt_conf.get('color_free', 'lightgrey')
+
+    if free:
+        idx = [j for i in free for j in range(i*stride, i*stride + stride)]
+        mesh = pv.PolyData(bl.surface_nodes, faces[idx])
+        plotter.add_mesh(mesh, color=color, opacity=plt_conf.get('opacity_free', 1.0),
+                         show_edges=False, lighting=True)
+
+    # edges of the block (sharp edges of the whole surface)
+    full = pv.PolyData(bl.surface_nodes, faces)
+    edges = full.extract_feature_edges(boundary_edges=True, feature_edges=True,
+                                       manifold_edges=False, non_manifold_edges=False,
+                                       feature_angle=20)
+    plotter.add_mesh(edges, color='black', line_width=plt_conf.get('line_width', 2))
+
     return
 
 

@@ -225,11 +225,21 @@ Abhängigkeit von h (flachere Blöcke, kleiner h, ergeben höhere Drücke).
 A_eff ist nur eingeschränkt vergleichbar: gezählt werden jetzt nur tatsächlich berührende Flächen
 und nur die inneren Blöcke.
 
-### 8.2 Plot-Fehler
+### 8.2 Plots
 
-`plot_assembly_quantity` brach bei Blöcken ohne Kontaktfläche ab (Rahmen-Eckblöcke, die keinen
-inneren Block berühren) → solche Blöcke werden übersprungen. Für die Paper-Skripte ohne Wirkung
-(dort hat jeder Block Kontaktflächen).
+- `plot_assembly_quantity` brach bei Blöcken ohne Kontaktfläche ab (Rahmen-Eckblöcke, die keinen
+  inneren Block berühren) → solche Blöcke werden übersprungen. Für die Paper-Skripte ohne Wirkung
+  (dort hat jeder Block Kontaktflächen).
+- **Blöcke waren im Plot nicht mehr erkennbar** (Hinweis von dir): Gezeichnet wurden nur die
+  Flächen mit Kontakt. Beim alten Modell waren das fast alle Seitenflächen (inkl. Schein-Auflager),
+  beim korrekten Modell nur noch die halben Kontaktbereiche → Oktaeder und Lücken unsichtbar.
+  Neue Option `show_free_faces` (in `scripts/planar/config.py` an, Default sonst aus, damit die
+  Paper-Plots unverändert bleiben): Flächen ohne Kontakt halbtransparent grau (`color_free`,
+  `opacity_free = 0.25`), Rahmenblöcke in `color_frame`, Kanten aller Blöcke schwarz.
+  *Warum halbtransparent:* Die Kontaktflächen liegen zwischen den Blöcken; undurchsichtige Blöcke
+  verdecken sie.
+- Die `_frame`-Ergebnisse wurden mit den neuen Plots neu erzeugt; Kennzahlen unverändert
+  (Abweichung < 1e-12).
 
 ### 8.3 Verzahnung Sinus-/Hexagon-Block
 

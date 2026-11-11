@@ -80,6 +80,11 @@ plot_config  = {
     'clim': None, # color map limits: None, [vmin, vmax]
     'assembly_all': 'together', # which part of the assembly to plot: 'together' (incl. frame), 'assembly'
     'zoom': 1.0,
+    # faces without contact: grey (color_free), frame blocks in color_frame,
+    # plus the edges of all blocks
+    'show_free_faces': True,
+    'color_free': 'lightgrey',
+    'opacity_free': 0.25, # transparent, so that the contact faces between the blocks stay visible
 }
 
 

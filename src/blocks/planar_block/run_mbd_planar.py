@@ -306,6 +306,9 @@ def analyse_contact_pressure(block_config, assembly_config, bvp_config, bvp_type
         print_contact_report(contacts['report'])
         solve_contacts(blocks, contacts, opts, info)
 
+        for i, bl in enumerate(blocks):
+            bl.is_frame = i in set(contacts['frame'])
+
         # results (snaps) only for the analysed blocks, the frame separately
         assembly_all['assembly'] = [blocks[i] for i in contacts['active']]
         assembly_all['frame'] = [blocks[i] for i in contacts['frame']]
