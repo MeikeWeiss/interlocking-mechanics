@@ -156,11 +156,19 @@ def create_block(
         if frame:
             if inout == 'in':
                 transform_sin_z_in(all_points, 1., 1., h, amplitude, frequency, shift*np.pi)
+            elif inout == 'in_top_out_bottom':
+                transform_sin_in_top_out_bottom_z(all_points, 1., 1., h, amplitude, frequency, shift * np.pi)
+            elif inout == 'in_bottom_out_top':
+                transform_sin_in_bottom_out_top_z(all_points, 1., 1., h, amplitude, frequency, shift * np.pi)
             else:
                 transform_sin_z(all_points, 1., 1., h, amplitude, frequency, shift*np.pi)
         else:
             if inout == 'in':
                 transform_sin_in(all_points, 1., 1., amplitude, frequency, shift*np.pi)
+            elif inout == 'in_top_out_bottom':
+                transform_sin_in_top_out_bottom(all_points, 1., 1., h, amplitude, frequency, shift * np.pi)
+            elif inout == 'in_bottom_out_top':
+                transform_sin_in_bottom_out_top(all_points, 1., 1., h, amplitude, frequency, shift * np.pi)
             else:
                 transform_sin(all_points, 1., 1., amplitude, frequency, shift*np.pi)
 
@@ -280,7 +288,7 @@ def group_faces( block ):
 
 ############################################################################
 
-def get_blocks(config):
+def get_blocks(config, assembly_config):
     
     # create the sinus block
     block = create_block(
@@ -311,6 +319,69 @@ def get_blocks(config):
 
     blocks = {
         'block': block,
+        'frame_block_bottom': frame_block_bottom,
+        'frame_block_top': frame_block_top,
+    }
+    
+    return blocks
+
+def get_blocks_inout(config, assembly_config):
+    
+    # create the sinus block
+    block1 = create_block(
+        config['n'], config['ri'], config['t'], config['h'],
+        config['n_l'], config['n_t'], config['n_h'],
+        config['amplitude'], config['frequency'], config['shift'],
+        config['cylindrical'], False, config['cell_types'],
+        'in_bottom_out_top'
+    )
+
+    block2 = create_block(
+        config['n'], config['ri'], config['t'], config['h'],
+        config['n_l'], config['n_t'], config['n_h'],
+        config['amplitude'], config['frequency'], config['shift'],
+        config['cylindrical'], False, config['cell_types'],
+        'in_top_out_bottom'
+    )
+
+    # create the bottom frame block
+    if assembly_config['order']:
+        frame_block_bottom = create_block(
+            config['n'], config['ri'], config['t'], config['h']/2,
+            config['n_l'], config['n_t'], config['n_h']//2,
+            config['amplitude'], config['frequency'], config['shift'],
+            config['cylindrical'], True, config['cell_types'],
+            'in_top_out_bottom'
+        )
+    else:
+        frame_block_bottom = create_block(
+            config['n'], config['ri'], config['t'], config['h']/2,
+            config['n_l'], config['n_t'], config['n_h']//2,
+            config['amplitude'], config['frequency'], config['shift'],
+            config['cylindrical'], True, config['cell_types'],
+            'in_bottom_out_top'
+        )
+        
+    # create the top frame block
+    if (assembly_config['order'] and assembly_config['n_layers'] % 2 == 0) or (not assembly_config['order'] and assembly_config['n_layers'] % 2 == 1):
+        frame_block_top = create_block(
+            config['n'], config['ri'], config['t'], config['h']/2,
+            config['n_l'], config['n_t'], config['n_h']//2,
+            config['amplitude'], config['frequency'], config['shift'],
+            config['cylindrical'], True, config['cell_types'],
+            'in_top_out_bottom'
+        )
+    else:
+        frame_block_top = create_block(
+            config['n'], config['ri'], config['t'], config['h']/2,
+            config['n_l'], config['n_t'], config['n_h']//2,
+            config['amplitude'], config['frequency'], config['shift'],
+            config['cylindrical'], True, config['cell_types'],
+            'in_bottom_out_top'
+        )
+
+    blocks = {
+        'block': [block1, block2],
         'frame_block_bottom': frame_block_bottom,
         'frame_block_top': frame_block_top,
     }

@@ -183,6 +183,9 @@ def set_plotter(plotter, plt_conf):
 def plot_faces( all_points, n_cells, cells_arr, plt_conf ):
 
     import vtk
+
+    vtk.vtkLogger.SetStderrVerbosity(vtk.vtkLogger.VERBOSITY_OFF)
+    vtk.vtkObject.GlobalWarningDisplayOff()
     
     # Create VTK axes actor
     vtk_axes = vtk.vtkAxesActor()
@@ -659,7 +662,7 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
 
     offset_contact_faces = 0
     for bl in assembly:
-        cells_idx = bl.data['face_groups']['contact_faces']
+        cells_idx = bl.face_groups['contact_faces']
         n_surf = len(cells_idx)
         if bl.data['cells']['3D'][0][0]==8:
             nodes_idx = [j for i in cells_idx for j in range(i*5, i*5 + 5)]

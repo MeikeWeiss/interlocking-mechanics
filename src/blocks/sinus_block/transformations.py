@@ -58,6 +58,40 @@ def transform_cos(points, l, t, amplitude, frequency):
     return points_1
 
 
+def transform_sin_in_bottom_out_top(points, l, t,h, amplitude, frequency, shift):
+    points_1 = []
+    z_values = [c[2] for c in points]
+    max_z = max(z_values)
+
+    for i in points:
+        if i[2]>max_z/2: # sine out
+            Ayz = amplitude * i[1]/t * (-1+2*i[2]/h)
+        elif i[2]<=max_z/2: # sine in
+            Ayz = -amplitude * (i[1] / t - t)* (-1+2*i[2]/h)
+        z = Ayz * np.sin(2 * np.pi * i[0] / l * frequency + shift)
+        i[2] += z
+        points_1.append(i)
+
+    return points_1
+
+
+def transform_sin_in_top_out_bottom(points, l, t,h, amplitude, frequency, shift):
+    points_1 = []
+    z_values = [c[2] for c in points]
+    max_z = max(z_values)
+
+    for i in points:
+        if i[2]<=max_z/2: # sine out
+            Ayz = amplitude * i[1] / t* (1-2*i[2]/h)
+        elif i[2]>max_z/2: # sine in
+            Ayz = -amplitude * (i[1] / t - t)* (1-2*i[2]/h)
+        z = Ayz * np.sin(2 * np.pi * i[0] / l * frequency + shift)
+        i[2] += z
+        points_1.append(i)
+
+    return points_1
+
+
 def transform_sin_z(points, l, t, h, amplitude, frequency, shift):
 
     points_1 = []
@@ -81,6 +115,40 @@ def transform_sin_z_in(points, l, t, h, amplitude, frequency, shift):
         i[2] += z
         points_1.append(i)
         
+    return points_1
+
+
+def transform_sin_in_bottom_out_top_z(points, l, t,h, amplitude, frequency, shift):
+    points_1 = []
+    z_values = [c[2] for c in points]
+    max_z = max(z_values)
+
+    for i in points:
+        if i[2]>max_z/2: # sine out
+            Ayz = amplitude * i[1]/t* i[2]/h * (-1+2*i[2]/h)
+        elif i[2]<=max_z/2: # sine in
+            Ayz = -amplitude * (i[1] / t - t)* i[2]/h * (-1+2*i[2]/h)
+        z = Ayz * np.sin(2 * np.pi * i[0] / l * frequency + shift)
+        i[2] += z
+        points_1.append(i)
+
+    return points_1
+
+
+def transform_sin_in_top_out_bottom_z(points, l, t,h, amplitude, frequency, shift):
+    points_1 = []
+    z_values = [c[2] for c in points]
+    max_z = max(z_values)
+
+    for i in points:
+        if i[2]<=max_z/2: # sine out
+            Ayz = amplitude * i[1] / t* i[2]/h* (1-2*i[2]/h)
+        elif i[2]>max_z/2: # sine in
+            Ayz = -amplitude * (i[1] / t - t)* i[2]/h* (1-2*i[2]/h)
+        z = Ayz * np.sin(2 * np.pi * i[0] / l * frequency + shift)
+        i[2] += z
+        points_1.append(i)
+
     return points_1
 
 

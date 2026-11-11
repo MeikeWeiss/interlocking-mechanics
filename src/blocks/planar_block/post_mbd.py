@@ -12,6 +12,8 @@ Reference:
 """
 
 import numpy as np
+import pandas as pd
+from pathlib import Path
 
 from src.engine.plots import plot_assembly_quantity
 from src.engine.util import makeDirIfNotExists, load_from_json
@@ -32,13 +34,37 @@ def analyse_results(snaps_file, show=False):
         print(f"Average effective area:\n {A_eff['average']}")
         
         #print(f"Average pressure masked per block:\n {measures['p_eff_bl']}")
-        #print(f"Average pressure masked: {measures['p_eff_bl_avg']}")
-        print(f"Average pressure:\n {measures['p_avg']}")
+        print(f"Average pressure masked: {measures['p_eff_bl_avg']}")
+        #print(f"Average pressure:\n {measures['p_avg']}")
         #print(f"Max pressure per block:\n {measures['p_max_bl']}")
         print(f"Max pressure:\n {measures['p_max']}")
         print(f"Average of max pressure:\n {measures['p_max_bl_avg']}")
 
     return {'A_eff': A_eff, 'measures': measures}
+
+def analyse_results_to_excel(snaps_file, output_file='results.xlsx', show=False):
+    
+    # load snaps
+    snaps = np.loadtxt(snaps_file)
+    
+    A_eff = compute_eff_area(snaps, show=False)
+    measures = measure_pc(snaps, A_eff['mask'], show=False)
+    
+    results = {
+        'Average effective area': A_eff['average'],
+        'Average pressure masked': {measures['p_eff_bl_avg']},
+        'Max pressure': measures['p_max'],
+        'Average of max pressure': measures['p_max_bl_avg']
+    }
+    
+    df = pd.DataFrame([results])
+    df.to_excel(output_file, index=False)
+    
+    if show:
+        print(f"Ergebnisse wurden in '{output_file}' gespeichert:")
+        print(df.to_string(index=False))
+    
+    return {'A_eff': A_eff, 'measures': measures, 'results': results}
 
 
 def measure_pc(snaps, M, show=False):

@@ -23,9 +23,39 @@ from src.engine.util import get_R_and_R6
 
 
 def get_assembly(blocks, assembly_config, block_config):
-    
-    # assemble a tube
+   
     assembly, offset = create_tube(blocks['block'], assembly_config['n_layers'])
+
+    # assemble frame: bottom and top
+    frame_bottom, offset = create_frame_bottom(
+        blocks['frame_block_bottom'],
+        assembly_config['n_layers'],
+        h_block=block_config['h'],
+        offset=offset
+    )
+    
+    frame_top, offset = create_frame_top(
+        blocks['frame_block_top'],
+        assembly_config['n_layers'],
+        h_block=block_config['h'],
+        offset=offset
+    )
+    
+    together = assembly + frame_bottom + frame_top
+
+    assembly_all = {
+        'assembly': assembly,
+        'frame_bottom': frame_bottom,
+        'frame_top': frame_top,
+        'assembly_frame_top': assembly + frame_top,
+        'together': together
+    }
+
+    return assembly_all
+
+def get_assembly_inout(blocks, assembly_config, block_config):
+    
+    assembly, offset = create_tube_inout(blocks['block'][0],blocks['block'][1], assembly_config['n_layers'], assembly_config['order'])
 
     # assemble frame: bottom and top
     frame_bottom, offset = create_frame_bottom(
@@ -96,6 +126,47 @@ def create_tube(block, n_block_layer ):
 
         offset['ID'] += block['n']
   
+    return assembly, offset
+
+def create_tube_inout(block1, block2, n_block_layer, order=True):
+    assembly = []
+    offset = {
+        'ID': 0,
+        'nodes': 0,
+        'cells': 0,
+        'cells_2D': 0,
+    }
+    for i in range(n_block_layer):
+
+        if i % 2 == 0:
+            for j in range(block1['n']):
+                k = j
+                if order:
+                    bl = init_block(block1, i, j, k, offset)
+                else:
+                    bl = init_block(block2, i, j, k, offset)
+                assembly.append(bl)
+
+                offset['nodes'] += bl.n_nodes
+                offset['cells'] += bl.n_cells
+                offset['cells_2D'] += bl.n_cells_2D
+                offset['ID'] += block1['n']
+
+        else:
+            for j in range(block1['n']):
+                f = block1['frequency']
+                k = j + 0.5 + 0.5 * (1 - 1 / f)
+                if order:
+                    bl = init_block(block2, i, j, k, offset)
+                else:
+                    bl = init_block(block1, i, j, k, offset)
+                assembly.append(bl)
+
+                offset['nodes'] += bl.n_nodes
+                offset['cells'] += bl.n_cells
+                offset['cells_2D'] += bl.n_cells_2D
+                offset['ID'] += block2['n']
+    
     return assembly, offset
 
 

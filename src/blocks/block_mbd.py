@@ -15,38 +15,42 @@ import numpy as np
 import pyvista as pv
 
 def get_block_matrices(block, q):
-
-    '''
-    f_ext: type str, name of the face group to load
-    '''
-
-    contact_faces = block['face_groups']['contact_faces']
-    f_ext_faces = block['face_groups']['f_ext_faces']
+    """
+    Compute block matrices A_b and p_b.
     
-    # block array
+    Args:
+        block: Block object with 'face_groups', 'unit_forces', 'unit_momentum', 'face_areas'
+        q: Load pressure
+    
+    Returns:
+        Block object with 'A_b' and 'p_b' attributes
+    """
+    contact_faces = block.face_groups['contact_faces']
+    f_ext_faces = block.face_groups['f_ext_faces']
+    
+    # Block array
     A_b = np.hstack([
-        block['unit_forces'][contact_faces,:],
-        block['unit_momentum'][contact_faces,:]
+        block.unit_forces[contact_faces, :],
+        block.unit_momentum[contact_faces, :]
     ]).T
 
-    # right side: sum the normals of the top plane and multiply with a scalar f
+    # Right side: sum the normals of the top plane and multiply with a scalar f
     if f_ext_faces.size == 0:
         p_b = np.zeros((6))
     else:
-        A = block['face_areas'][f_ext_faces]
-        f = q * A # compute force from load pressure q
-        F_b = np.sum(f[:, np.newaxis] * block['unit_forces'][f_ext_faces,:], axis=0)
-        M_b = np.sum(f[:, np.newaxis] * block['unit_momentum'][f_ext_faces,:], axis=0)
+        A = block.face_areas[f_ext_faces]
+        f = q * A  # compute force from load pressure q
+        F_b = np.sum(f[:, np.newaxis] * block.unit_forces[f_ext_faces, :], axis=0)
+        M_b = np.sum(f[:, np.newaxis] * block.unit_momentum[f_ext_faces, :], axis=0)
         p_b = np.hstack([F_b, M_b])
 
-    block['A_b'] = A_b
-    block['p_b'] = p_b
+    block.A_b = A_b
+    block.p_b = p_b
     
     return block
 
 
 def get_mbd_data(block):
-
     surface = extract_block_surface(
         block['all_points'],
         len(block['cells']['3D']),
@@ -100,6 +104,8 @@ def extract_block_surface( all_points, n_cells, cells_arr ):
         
     elif cells_arr[0] == 8:
         cell_types = np.full(n_cells, pv.CellType.HEXAHEDRON)
+    elif cells_arr[0] == 3:
+        cell_types = np.full(n_cells, pv.CellType.TRIANGLE)
 
     # Build mesh
     mesh = pv.UnstructuredGrid(cells_arr, cell_types, all_points)

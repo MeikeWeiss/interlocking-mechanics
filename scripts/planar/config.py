@@ -14,19 +14,20 @@ info = {
 
 block_config = {
     'refinement': 2, # number of refinement levels for the triangulation of the block
-    'type': 'versatile', # 'versatile', 'bisquare'
-    'h': None
+    'type': 'versatile',
+    'h': None,
+    'edgeLength': None
 }
 
 assembly_config = {
     'n': 4, 
     'm': 4,
-    'group': 'p1', # 'p1', 'pg', 'p4'
+    'group': 'p1',
     'lp_method': 'mechanism_test', # 'dof', 'norm2', 'wang2018', 'mechanism_test'
 }
 
 bc_config = {
-    'q': 0.01, # external force
+    'q': 0.1, # external force
 }
 
 out_config = {
@@ -61,7 +62,7 @@ plot_config  = {
     'html': True, # set 'show' on False
     'views': ['pers'], # None, 'xy', 'yx',['xy', ]
     'parallel': False, # parallel projection (perspective): True
-    'clim': [0., 1.5], # color map limits: None, [vmin, vmax]
+    'clim': None, # color map limits: None, [vmin, vmax]
     'assembly_all': 'assembly', # which part of the assembly to plot
     'zoom': 1.0,
 }
@@ -71,26 +72,39 @@ plot_config  = {
 # BVP cases
 #####################################################################
 
+# Flächen, die nicht im Kontakt sind müssen kategorisiert werden
 blocks_bvp_config = {
     'ceiling': {
         'block': {
             'q': 1e-2, # MPa
-            'f_ext_surf': ['top_surf',],
-            'free_surf': ['bottom_surf',],
+            'f_ext_surf': ['top_surf',], # Flächen auf die Last aufgetragen werden
+            'free_surf': ['bottom_surf',], # Flächen die nicht im Kontakt sind und keine Last aufnehmen
+        }
+    },
+    'wall_left': {
+        'block': {
+            'q': 1e-2, # MPa
+            'f_ext_surf': ['ext_surf', 'top_left'], # Flächen auf die Last aufgetragen werden
+            'free_surf': ['top_surf','bottom_surf'],
         },
-        #'frame': {
-        #    'q': 0.,
-        #    'f_ext_surf': [],
-        #    'free_surf': [],
-        #}
-    }
+    },
+    'wall_right': {
+            'block': {
+                'q': 1e-2, # MPa
+                'f_ext_surf': ['ext_surf', 'top_right'], # Flächen auf die Last aufgetragen werden
+                'free_surf': ['top_surf','bottom_surf'],
+            },
+        }
 }
 
 
 def set_bvp( bvp_type, assembly_all, block_config, assembly_config):
     
     if bvp_type == 'ceiling':
-
         ass_part = 'assembly'
-        
+    elif bvp_type == 'wall_left':
+        ass_part = 'assembly'
+    elif bvp_type == 'wall_right':
+        ass_part = 'assembly'
+
     return ass_part

@@ -52,7 +52,7 @@ def split_solutions_by_blocks(solutions, assembly):
 
         for bl in assembly:
             
-            cells_idx = bl.data['face_groups']['contact_faces']
+            cells_idx = bl.face_groups['contact_faces']
             n_surf = len(cells_idx)
 
             bl.solutions[sol_name] = sol[offset_contact_faces:offset_contact_faces+n_surf]
@@ -63,15 +63,13 @@ def split_solutions_by_blocks(solutions, assembly):
 
 
 def compute_pc(assembly):
-
     '''computes contact pressure. lam has to be computed first'''
-
     for bl in assembly:
-
         lam = bl.solutions['lam']
-        A = bl.data['face_areas'][bl.data['face_groups']['contact_faces']]
+        
+        A = bl.face_areas[bl.face_groups['contact_faces']]
         bl.solutions['Contact pressure'] = lam / A
-
+    
     return
 
 
@@ -314,7 +312,7 @@ def get_edges(assembly, show_C=False):
     #contact_face_centers = np.vstack([bl.face_centers[6:,:] for bl in assembly])
     contact_face_centers = np.vstack([
         bl.face_centers[
-        bl.data['face_groups']['contact_faces'],:] for bl in assembly
+         bl.face_groups['contact_faces'],:] for bl in assembly
     ])
     
     neighbors = find_neighbors(contact_face_centers).tolist()

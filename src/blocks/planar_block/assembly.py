@@ -7,7 +7,7 @@ from src.engine.plots import *
 from src.blocks.planar_block.meshing_mbd import *
 
 
-# Square centerd around (0,0) with edge length Sqrt(2) and rotated by 45 degrees
+# Square centered around (0,0) with edge length Sqrt(2) and rotated by 45 degrees
 
 def get_assembly(blocks, assembly_config, block_config):
     n = assembly_config['n']
@@ -20,10 +20,17 @@ def get_assembly(blocks, assembly_config, block_config):
         assembly, offset = create_pg(blocks['block'], n, m)
     elif group == 'p4':
         assembly, offset = create_p4(blocks['block'], n, m)
+    elif group == 'p1_brick':
+        assembly, offset = create_p1_brick(blocks['block'], n, m)
+    elif group == 'octa':
+        assembly, offset = create_octahedron_assembly(blocks['block'], n, m, block_config['h'])
+    elif group == 'irr_octa':
+        assembly, offset = create_irr_octahedron_assembly(blocks['block'], n, m, block_config['h'])
+    else:
+        raise ValueError(f"Unknown group: {group}")
 
     together = assembly 
 
-    # To Do Frame
     assembly_all = {
         'assembly': assembly,
         'frame': [],
@@ -153,6 +160,33 @@ def create_p4(block, nx, ny ):
 
     return assembly, offset
 
+def create_p1_brick(block, nx, ny ):
+
+    assembly = []
+    offset = {
+        'id': 0,
+        'nodes': 0,
+        'cells': 0,
+    }
+
+    center = [1,0.25]
+    
+    for i in range(nx):
+        for j in range(ny):
+            if j%2==0:
+                trans_j = [2*i,0.5*j]
+            else:
+                trans_j = [2*i+1,0.5*j]
+        
+            bl = init_block(block, offset,[center[0] +trans_j[0],center[1] + trans_j[1]], alpha=0.)
+            assembly.append(bl)
+
+            offset['id'] += 1
+            offset['nodes'] += bl.n_nodes
+            offset['cells'] += bl.n_cells
+
+    return assembly, offset
+
 
 def create_grid(nx, ny):
 
@@ -174,6 +208,63 @@ def create_grid(nx, ny):
     
 
     return rotated_points.T
+
+def create_irr_octahedron_assembly(block, n, m, h):
+  
+    edge_length = np.sqrt(4. / np.sqrt(3.)) *1/h # np.sqrt(4. / np.sqrt(3.)) *1/h, np.sqrt(3) / np.sqrt(2)  # regulär, für Höhe 1
+    h = np.sqrt(3) / 2 * edge_length
+
+    assembly = []
+    offset = {'id': 0, 'nodes': 0, 'cells': 0}
+
+    for i in range(m):        # Zeilen
+        for j in range(n):    # Spalten
+
+            x_translation = i * 1.5 * edge_length / 2
+            y_translation = j * h
+            if i % 2 != 0:
+                y_translation -= h / 2
+
+            position = np.array([x_translation, y_translation])  # nur 2D, wie in create_p4
+            alpha = 0.0  # keine Rotation -- siehe Hinweis unten
+
+            bl = init_block(block, offset, position, alpha)
+            assembly.append(bl)
+
+            offset['id'] += 1
+            offset['nodes'] += bl.n_nodes
+            offset['cells'] += bl.n_cells
+
+    return assembly, offset
+
+
+def create_octahedron_assembly(block, n, m,h):
+  
+    edge_length = np.sqrt(3) / np.sqrt(2) # np.sqrt(4. / np.sqrt(3.)) *1/h, np.sqrt(3) / np.sqrt(2)  # regulär, für Höhe 1
+    h = np.sqrt(3) / 2 * edge_length
+
+    assembly = []
+    offset = {'id': 0, 'nodes': 0, 'cells': 0}
+
+    for i in range(m):        # Zeilen
+        for j in range(n):    # Spalten
+
+            x_translation = i * 1.5 * edge_length / 2
+            y_translation = j * h
+            if i % 2 != 0:
+                y_translation -= h / 2
+
+            position = np.array([x_translation, y_translation])  # nur 2D, wie in create_p4
+            alpha = 0.0  # keine Rotation -- siehe Hinweis unten
+
+            bl = init_block(block, offset, position, alpha)
+            assembly.append(bl)
+
+            offset['id'] += 1
+            offset['nodes'] += bl.n_nodes
+            offset['cells'] += bl.n_cells
+
+    return assembly, offset
 
 
 ########################################################################
@@ -249,12 +340,12 @@ class Block():
     
 def init_block(data, offset, pos, alpha):
     '''Initializes the block object and sets the global node ids'''
-    
+
     bl = Block(
         offset['id'],
         data,
         np.concatenate([pos, [0]]),
-        alpha, # rot_angle
+        alpha#, rot_angle
     )
     
     # Set offset of the block ids
