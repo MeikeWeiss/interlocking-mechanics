@@ -9,3 +9,6 @@ pyvista
 pyvista[jupyter]
 tqdm
 json_tricks
+# planar post-processing (Excel export)
+pandas
+xlsxwriter

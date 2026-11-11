@@ -4,6 +4,22 @@ Review des Branches `meike/planar` inkl. uncommitteter Änderungen (Basis: Commi
 Getestet mit kleinen Modellen (ohne Plots) in einer separaten Python-3.10-Umgebung
 (numpy 2.2, cvxpy 1.7, pyvista 0.49).
 
+## Status (Branch `fix/sinus-reproducibility`)
+
+| Punkt | Status |
+|---|---|
+| 1. Shared Code / Sinus kaputt | **behoben**: `src/blocks/run_mbd.py` wieder mit Release-Semantik (Setup der Referenzblöcke vor der Assemblierung), planare Logik in `src/blocks/planar_block/run_mbd_planar.py`; `analysis_sinus/mbd.py` = Release-Stand, In/Out-Variante nach `scripts/sinus_inout/mbd_inout.py`; `extract_surface(algorithm="dataset_surface")` explizit (Face-Reihenfolge unabhängig von pyvista-Version); kaputte Importpfade in `figures/*.py`, `post_snaps.py`, `mbd_bvp_layer.py` korrigiert |
+| 2. Oktaeder Phantom-Auflager | offen (Schritt 2) |
+| 3. `wall_right` crasht | **behoben** (Ausdehnung der Assembly aus der Geometrie) |
+| 4. `n_fixed=8` hart codiert | **behoben**: Anzahl Frame-Blöcke aus der Assembly (Sinus n=4: weiterhin 8), planar `n_fixed=0`, `Y[-0:]`-Falle abgefangen |
+| 5. Normalen `brick`/`brick_inter` | **behoben**: Normalen nach außen, `unit_forces`-Überschreibungen entfernt, Block-Arrays kopiert, Ebenen aus z-Ausdehnung des Blocks. Ergebnisse identisch zum vorherigen Stand |
+| 6. Kleinere Fehler | **behoben**: Ordnername in `post_results.py`, NaN in planaren Kennzahlen, `out_dir_override`, `requirements.txt`, `errno`, `trimesh`-Import, `centroid`-Tupel, `octahedron_param` |
+| Methodische Punkte | offen (zur Diskussion) |
+
+Hinweis: Der planare Interlocking-Test (jetzt `n_fixed=0`) findet für `versatile`/`p4` 3×3, ref 0
+eine Bewegung erster Ordnung (Anheben mit Verkippen, s = 0). Ob sie echt ist oder an der impliziten
+Rahmen-Darstellung (ungepaarte Flächen) liegt, gehört zu Schritt 2.
+
 ## Kurzfazit
 
 - Planar `ceiling` mit `versatile`/`bisquare` (`p4`/`p1`/`pg`) funktioniert: Gleichgewicht wird

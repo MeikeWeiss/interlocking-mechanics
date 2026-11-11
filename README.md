@@ -42,6 +42,17 @@ Typical tasks performed by the scripts include:
 
 The scripts rely on the implementation contained in the `src/` directory and write results to the `outputs/` directory.
 
+### Planar Assemblies (`scripts/planar/`)
+
+MBD analysis of planar interlocking assemblies (versatile, bisquare, octahedron
+and brick blocks) with `ceiling` and `wall` boundary conditions.
+See `scripts/planar/README.md`.
+
+### Sine Blocks with Alternating In/Out Layers (`scripts/sinus_inout/`)
+
+Assemblies of sine blocks whose sine profile alternates between inside and
+outside from layer to layer (not part of the publication).
+
 ---
 
 ## Reproducibility
