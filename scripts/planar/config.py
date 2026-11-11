@@ -1,16 +1,21 @@
 import numpy as np
-from src.engine.plots import plot_points_with_directions
 
-info = {
-    't_cpu': {
-        'real_0': {},
-        'real_1': {},
-        'cpu_0': {},
-        'cpu_1': {},
-        'dt_cpu': {},
-        'dt_real': {},
+
+def new_info():
+    '''fresh dict for the computation info (timings, residuals) of one run'''
+    return {
+        't_cpu': {
+            'real_0': {},
+            'real_1': {},
+            'cpu_0': {},
+            'cpu_1': {},
+            'dt_cpu': {},
+            'dt_real': {},
+        }
     }
-}
+
+
+info = new_info()
 
 block_config = {
     'refinement': 2, # number of refinement levels for the triangulation of the block
@@ -26,9 +31,6 @@ assembly_config = {
     'lp_method': 'mechanism_test', # 'dof', 'norm2', 'wang2018', 'mechanism_test'
 }
 
-bc_config = {
-    'q': 0.1, # external force
-}
 
 out_config = {
     'out_dir': './outputs/planar/',
@@ -72,7 +74,8 @@ plot_config  = {
 # BVP cases
 #####################################################################
 
-# Flächen, die nicht im Kontakt sind müssen kategorisiert werden
+# Flächen, die nicht im Kontakt sind müssen kategorisiert werden.
+# Kontaktflächen ohne Kontaktpartner wirken als starres Auflager (Rahmen).
 blocks_bvp_config = {
     'ceiling': {
         'block': {
@@ -96,15 +99,3 @@ blocks_bvp_config = {
             },
         }
 }
-
-
-def set_bvp( bvp_type, assembly_all, block_config, assembly_config):
-    
-    if bvp_type == 'ceiling':
-        ass_part = 'assembly'
-    elif bvp_type == 'wall_left':
-        ass_part = 'assembly'
-    elif bvp_type == 'wall_right':
-        ass_part = 'assembly'
-
-    return ass_part

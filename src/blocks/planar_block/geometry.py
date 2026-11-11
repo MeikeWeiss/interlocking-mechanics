@@ -5,7 +5,6 @@ Contains functions to generate vertices and faces for various block types.
 
 from typing import Tuple, Optional
 import numpy as np
-import trimesh
 import pyvista as pv
 from src.blocks.planar_block.meshing_mbd import refine_triangulation
 
@@ -398,7 +397,7 @@ def get_block_geometry(block_type: str, refinement: int, h: Optional[float] = No
     
     generator = BLOCK_GENERATORS[block_type]
     
-    if block_type in ['versatile_param', 'bisquare_param', 'octahedron_param', 'irr_octahedron']:
+    if block_type in ['versatile_param', 'bisquare_param', 'irr_octahedron']:
         if h is None:
             raise ValueError(f"Parameter h required for block type: {block_type}")
         return generator(refinement, h)

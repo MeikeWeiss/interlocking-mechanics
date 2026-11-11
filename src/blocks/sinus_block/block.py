@@ -288,7 +288,7 @@ def group_faces( block ):
 
 ############################################################################
 
-def get_blocks(config, assembly_config):
+def get_blocks(config, assembly_config=None):
     
     # create the sinus block
     block = create_block(

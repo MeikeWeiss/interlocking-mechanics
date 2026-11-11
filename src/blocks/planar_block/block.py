@@ -1,124 +1,97 @@
 """
-Block creation and manipulation module.
+Block creation and face grouping for planar assemblies.
 """
 
 import logging
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 import numpy as np
 import pyvista as pv
-from src.blocks.planar_block.geometry import get_block_geometry, BlockConstants
+from src.blocks.planar_block.geometry import get_block_geometry
 
 logger = logging.getLogger(__name__)
+
+# tolerance for classifying faces by their coordinates
+TOL = 1e-9
 
 
 class Block:
     """
-    Represents a single block in the assembly.
-    
+    Reference block (surface triangulation) of a planar assembly.
+
     Attributes:
         vertices: Array of vertex coordinates
-        faces: Array of face indices
-        surface: PyVista PolyData surface
-        centroid: Center of mass
+        faces: Array of face indices (triangles)
+        mesh: PyVista PolyData of the surface
+        centroid: Reference point for the moments
         face_centers: Centers of each face
-        face_normals: Normals of each face
-        unit_forces: Unit force vectors for each face
-        unit_momentum: Unit momentum vectors for each face
-        A_b: Block matrix A (forces and moments)
-        p_b: Block vector p (external forces and moments)
+        face_normals: Outward unit normals of each face
+        face_areas: Area of each face
+        unit_forces: Unit contact force of each face (= -outward normal)
+        unit_momentum: Unit moment of each face w.r.t. the centroid
     """
-    
+
     def __init__(self, block_type: str, refinement: int, h: Optional[float] = None):
-        """
-        Initialize a block.
-        
-        Args:
-            block_type: Type of block to create
-            refinement: Number of refinement levels
-            h: Optional parameter for parameterized blocks
-        """
         self.block_type = block_type
         self.refinement = refinement
         self.h = h
-        
+
         # Generate geometry
         self.vertices, self.faces = get_block_geometry(block_type, refinement, h)
-        
+
         # Compute derived properties
         self._compute_properties()
-    
+
     def _compute_properties(self) -> None:
         """Compute all derived properties of the block."""
-        # Create PyVista mesh
         cells = np.hstack([[3, *face] for face in self.faces]).astype(np.int64)
         self.mesh = pv.PolyData(self.vertices, cells)
-        self.surface = self.mesh.extract_surface().compute_cell_sizes(
-            length=False, volume=False, area=True
+
+        # all quantities refer to the faces of self.mesh in the order of self.faces
+        self.face_areas = np.asarray(
+            self.mesh.compute_cell_sizes(length=False, area=True, volume=False)["Area"]
         )
-        
-        # Compute centroid
+        self.face_centers = np.asarray(self.mesh.cell_centers().points)
+
+        # consistently oriented normals (the face order is kept) ...
+        normals_mesh = self.mesh.compute_normals(
+            cell_normals=True, point_normals=False, consistent_normals=True,
+            auto_orient_normals=False, split_vertices=False,
+        )
+        face_normals = np.asarray(normals_mesh.cell_data["Normals"], dtype=float)
+
+        # ... that point outwards: for a closed surface the flux
+        # sum((c - x0) . n * A) equals 3 * volume > 0
+        x0 = self.vertices.mean(axis=0)
+        flux = np.sum(np.einsum('ij,ij->i', self.face_centers - x0, face_normals) * self.face_areas)
+        if flux < 0.:
+            face_normals = -face_normals
+        self.face_normals = face_normals
+
+        # Reference point for the moments
         self.centroid = self.mesh.center_of_mass()
-        
-        # Compute face properties
-        normals_mesh = self.mesh.compute_normals(cell_normals=True, point_normals=False)
-        self.face_normals = normals_mesh.cell_data["Normals"]
-        self.face_areas = self.surface["Area"]
-        self.face_centers = self.mesh.cell_centers().points
+
+        # contact force acts against the outward normal
         self.unit_forces = -self.face_normals
-        
-        # Compute lever vectors
+
+        # Lever vectors (component perpendicular to the normal)
         self.lever_vectors = np.array([
             r - np.dot(r, n) * n
             for r, n in zip(self.face_centers - self.centroid, self.face_normals)
         ])
-        
-        # Compute unit momentum
+
+        # Unit moment (sign convention of the original implementation:
+        # moment rows of A_b and p_b use the same sign, so equilibrium is unaffected)
         self.unit_momentum = np.cross(self.lever_vectors, -self.unit_forces)
-        
-        # Compute block matrix A (6x6)
-        # Using faces 6 and above (typically side faces)
-        A_b = np.hstack([
-            self.unit_forces[6:, :],
-            self.unit_momentum[6:, :]
-        ]).T
-        
-        # Compute force and moment on top faces (indices 2-5)
-        f = 1.0
-        F_b = f * np.sum(self.unit_forces[2:6, :], axis=0)
-        M_b = f * np.sum(self.unit_momentum[2:6, :], axis=0)
-        self.p_b = -np.hstack([F_b, M_b])
-        
-        # Store only the non-singular part of A (usually 6x6)
-        self.A_b = A_b
-    
-    def get_surface_groups(self) -> Dict[str, List[int]]:
-        """
-        Group faces by surface type.
-        
-        Returns:
-            Dictionary with 'top_surf' and 'bottom_surf' face indices
-        """
-        surfaces = {
-            'top_surf': [],
-            'bottom_surf': [],
-        }
-        
-        for i, face in enumerate(self.faces):
-            z_vals = self.vertices[face, 2]
-            
-            if np.allclose(z_vals, BlockConstants.Z_BOTTOM):
-                surfaces['bottom_surf'].append(i)
-            elif np.allclose(z_vals, BlockConstants.Z_TOP):
-                surfaces['top_surf'].append(i)
-        
-        return surfaces
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert block to dictionary for serialization."""
+        """Convert block to dictionary used by the assembly."""
+        cells = np.hstack([[3, *face] for face in self.faces]).astype(np.int64)
         return {
+            'block_type': self.block_type,
             'all_points': self.vertices,
             'cells': {'3D': self.faces},
-            'surface': self.surface,
+            'cells_arr': {'3D': cells},
+            'surface': self.mesh,
             'face_areas': self.face_areas,
             'centroid': self.centroid,
             'face_centers': self.face_centers,
@@ -126,40 +99,24 @@ class Block:
             'unit_forces': self.unit_forces,
             'lever_vectors': self.lever_vectors,
             'unit_momentum': self.unit_momentum,
-            'A_b': self.A_b,
-            'p_b': self.p_b,
         }
 
 
 def create_block(block_type: str, refinement: int, h: Optional[float] = None) -> Dict[str, Any]:
-    """
-    Factory function to create a block.
-    """
-    block = Block(block_type, refinement, h)
-    block_dict = block.to_dict()
-    
-    # Füge cells_arr hinzu (wird von assembly.py benötigt)
-    cells = np.hstack([[3, *face] for face in block.faces]).astype(np.int64)
-    block_dict['cells_arr'] = {'3D': cells}
-    
-    return block_dict
+    """Factory function to create a reference block (dict)."""
+    return Block(block_type, refinement, h).to_dict()
 
 
-# ============================================================================
-# WICHTIG: Diese Funktion MUSS existieren für den Import in mbd_planar.py
-# ============================================================================
-
-def get_blocks(config: Dict[str, Any]) -> Dict[str, Any]:
+def get_blocks(config: Dict[str, Any], assembly_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Get blocks from configuration.
-    
-    This function is required by the simulation framework.
-    
+    Get the reference blocks from the configuration.
+
     Args:
-        config: Dictionary with block configuration (refinement, type, h, edgeLength)
-    
+        config: block configuration (refinement, type, h)
+        assembly_config: unused, same signature as for the other block types
+
     Returns:
-        Dictionary with 'block' key containing the block properties
+        Dictionary with key 'block'
     """
     block = create_block(
         block_type=config['type'],
@@ -173,50 +130,72 @@ def get_blocks(config: Dict[str, Any]) -> Dict[str, Any]:
 # Group faces functions
 # ============================================================================
 
-def group_faces(block: Dict[str, Any]) -> Dict[str, Any]:
+def _on_plane(vals, value):
+    return np.allclose(vals, value, atol=TOL)
+
+
+def group_faces(block):
     """
-    Group faces of a block by surface type (ceiling boundary conditions).
-    
+    Group the faces of a placed block for the 'ceiling' boundary conditions:
+    bottom and top plane of the block (lowest and highest z).
+
     Args:
-        block: Block dictionary from create_block
-    
+        block: Block object of the assembly
+
     Returns:
-        Block dictionary with added 'surf_filter' key
+        Block object with 'surf_filter' attribute
     """
     faces = block.cells_2D
     verts = block.nodes
-    
+    z_bottom = verts[:, 2].min()
+    z_top = verts[:, 2].max()
+
     surfaces = {
         'top_surf': [],
         'bottom_surf': [],
     }
-    
+
     for i, f in enumerate(faces):
         z_vals = verts[f, 2]
-        
-        if np.allclose(z_vals, BlockConstants.Z_BOTTOM):
+
+        if _on_plane(z_vals, z_bottom):
             surfaces['bottom_surf'].append(i)
-        elif np.allclose(z_vals, BlockConstants.Z_TOP):
+        elif _on_plane(z_vals, z_top):
             surfaces['top_surf'].append(i)
-    
+
     block.surf_filter = surfaces
-      
+
     return block
 
-def group_faces_wall(block, x_max, y_max):
+
+def group_faces_wall(block, extent):
     """
-    Group faces of a Block object for wall boundary conditions.
-    
+    Group the faces of a placed block for wall boundary conditions.
+
+    The wall lies in the x-y plane (x: along the wall, y: height); the
+    z-direction is the thickness of the wall.
+
+    Surfaces:
+        bottom_surf / top_surf: back and front of the wall (lowest/highest z)
+        ext_surf:  faces of the top row that are loaded from above
+        top_left:  left end face of the top row
+        top_right: right end face of the top row
+
     Args:
-        block: Block object
-        y_max_global: Maximum y-coordinate in the entire assembly
-    
+        block: Block object of the assembly
+        extent: dict with 'x_min', 'x_max', 'y_max' of the whole assembly
+
     Returns:
-        Block object with added 'surf_filter' attribute
+        Block object with 'surf_filter' attribute
     """
     faces = block.cells_2D
     verts = block.nodes
-    
+    z_bottom = verts[:, 2].min()
+    z_top = verts[:, 2].max()
+
+    x_min, x_max, y_max = extent['x_min'], extent['x_max'], extent['y_max']
+    row_height = extent.get('row_height', 0.5)
+
     surfaces = {
         'top_surf': [],
         'bottom_surf': [],
@@ -224,27 +203,27 @@ def group_faces_wall(block, x_max, y_max):
         'ext_surf': [],
         'top_left': [],
         'top_right': []}
-    
+
     for i, f in enumerate(faces):
         x_vals = verts[f, 0]
         y_vals = verts[f, 1]
         z_vals = verts[f, 2]
 
-        if np.allclose(z_vals, -1) :
+        in_top_row = np.any(y_vals > y_max - row_height + TOL)
+
+        if _on_plane(z_vals, z_bottom):
             surfaces['bottom_surf'].append(i)
-        elif np.allclose(z_vals, 0):
+        elif _on_plane(z_vals, z_top):
             surfaces['top_surf'].append(i)
-        elif np.allclose(y_vals, y_max):
+        elif _on_plane(y_vals, y_max):
             surfaces['ext_surf'].append(i)
-            block.unit_forces[i] = np.array([0, 1, 0])
-        elif np.any(y_vals > y_max-0.5) and block.face_normals[i, 2] != 0:
+        elif in_top_row and abs(block.face_normals[i, 2]) > TOL:
+            # inclined top faces (e.g. brick_inter)
             surfaces['ext_surf'].append(i)
-        elif np.any(y_vals > y_max-0.5) and np.any(x_vals < 2): # TODO anpassen an kurze Reihen
+        elif in_top_row and np.any(x_vals < x_min + 1.):  # TODO adapt to short rows
             surfaces['top_left'].append(i)
-            block.unit_forces[i] = np.array([-1, 0, 0])
-        elif np.any(y_vals > y_max-0.5) and np.any(x_vals >= x_max):
+        elif in_top_row and np.any(x_vals >= x_max - TOL):
             surfaces['top_right'].append(i)
-            block.unit_forces[i] = np.array([1, 0, 0])
 
     block.surf_filter = surfaces
 

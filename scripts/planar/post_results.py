@@ -1,15 +1,14 @@
 import os
 from scripts.planar.config import *
 from src.blocks.planar_block.post_mbd import compute_eff_area, measure_pc
+from scripts.planar.mbd_planar import get_run_name
 import numpy as np
 import pandas as pd
 
-def get_snaps_file_path(type, group, refinement, n, m, h, out_config):
+def get_snaps_file_path(type, group, refinement, n, m, h, out_config, bvp='ceiling'):
 
-    if h is not None:
-        out_config['name'] = f'{type}_{group}_{refinement}_{n}x{m}_h{h:.3f}'
-    else:
-        out_config['name'] = f'{type}_{group}_{refinement}_{n}x{m}'
+    # same folder name as in scripts/planar/mbd_planar.py
+    out_config['name'] = get_run_name(type, group, bvp, refinement, n, m, h)
     return f"{out_config['out_dir']}{out_config['name']}/snaps.txt"
 
 
@@ -119,6 +118,7 @@ def analyse_results_batch(h_list,
                           m=6, 
                           output_filename='results.xlsx', 
                           out_dir='./outputs/planar/',
+                          bvp='ceiling',
                           show=True):
     
     out_config['out_dir'] = out_dir
@@ -133,7 +133,7 @@ def analyse_results_batch(h_list,
             'type': type,
             'h': h
         })
-        snaps_file = get_snaps_file_path(type, group, refinement, n, m, h, out_config)
+        snaps_file = get_snaps_file_path(type, group, refinement, n, m, h, out_config, bvp)
         
         try:
             snaps = np.loadtxt(snaps_file)

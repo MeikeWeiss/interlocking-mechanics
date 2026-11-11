@@ -18,7 +18,7 @@ from pathlib import Path
 from src.engine.plots import plot_assembly_quantity
 from src.engine.util import makeDirIfNotExists, load_from_json
 from src.blocks.planar_block.assembly import Block
-from src.blocks.run_mbd import setup_blocks
+from src.blocks.planar_block.run_mbd_planar import setup_blocks_planar
 
 
 def analyse_results(snaps_file, show=False):
@@ -69,13 +69,18 @@ def analyse_results_to_excel(snaps_file, output_file='results.xlsx', show=False)
 
 def measure_pc(snaps, M, show=False):
     
+    # snaps may contain NaN (padding, if the blocks have different numbers
+    # of contact faces); NaN entries are ignored
+    snaps_0 = np.nan_to_num(snaps, nan=0.)
+    M = M & ~np.isnan(snaps)
+
     # average of masked elements per column
-    avg_pc_masked_per_block = (snaps * M).sum(axis=0) / M.sum(axis=0)
-    avg_pc_masked = (snaps * M).sum() / M.sum()
-    avg_pc = np.mean(snaps)
+    avg_pc_masked_per_block = (snaps_0 * M).sum(axis=0) / M.sum(axis=0)
+    avg_pc_masked = (snaps_0 * M).sum() / M.sum()
+    avg_pc = np.nanmean(snaps)
     
-    max_pc_per_block = np.max(snaps, axis=0)
-    max_pc = np.max(snaps)
+    max_pc_per_block = np.nanmax(snaps, axis=0)
+    max_pc = np.nanmax(snaps)
     avg_max_pc_per_block = np.mean(max_pc_per_block)
 
     measures = {
@@ -105,15 +110,20 @@ def compute_eff_area(snaps, show=False):
     (sensitive to distribution concentration) in the contact.
     '''
     
+    # snaps may contain NaN (padding, if the blocks have different numbers
+    # of contact faces); NaN entries are ignored
+    valid = ~np.isnan(snaps)
+    n_faces = valid.sum(axis=0)  # number of contact faces per block
+
     # Participation ratio / effective area
-    f = np.abs(snaps) 
+    f = np.abs(np.nan_to_num(snaps, nan=0.))
     N_eff = (f.sum(axis=0)**2) / ( (f**2).sum(axis=0) + 1e-30 )
-    eff_fraction_per_block = N_eff / snaps.shape[0]
+    eff_fraction_per_block = N_eff / n_faces
     
     # Mask from participation ratio
     M = np.zeros_like(snaps, dtype=bool)  # (n, m)
     for j in range(snaps.shape[1]):
-        col = np.abs(snaps[:, j])
+        col = f[:, j]
         N_eff_j = int((col.sum()**2) / ( (col**2).sum() + 1e-30 ))
         idx_sorted = np.argsort(col)[::-1]
         M[idx_sorted[:N_eff_j], j] = True
@@ -165,9 +175,9 @@ def plot_snaps(snaps_file,
     # load snaps
     snaps = np.loadtxt(snaps_file)
     
-    # create blocks and set them up for mbd simulation
+    # create the reference block and set it up for the plot
+    # (group_faces is not used: the faces are grouped by the planar driver)
     blocks = get_blocks(block_config)
-    setup_blocks(blocks, group_faces, blocks_bvp_config[bvp_type],bvp_type)
 
     # initialize block
     bl = Block(
@@ -176,6 +186,7 @@ def plot_snaps(snaps_file,
         np.array([0., 0., 0.]),
         0.
     )
+    setup_blocks_planar([bl], blocks_bvp_config[bvp_type], bvp_type)
     
     for s in range(n_snaps):
 

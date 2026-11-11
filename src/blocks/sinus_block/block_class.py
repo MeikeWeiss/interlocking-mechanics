@@ -65,6 +65,11 @@ class Block():
         self.surface_nodes = surface_nodes
         self.face_centers = face_centers
         
+        # face groups and areas of the reference block (same for all copies);
+        # accessed by the MBD engine as attributes, like for planar blocks
+        self.face_groups = data.get('face_groups')
+        self.face_areas = data.get('face_areas')
+
         self.cells_2D = data['cells']['2D']
         self.cells_2D_arr = data['surface'].faces
         

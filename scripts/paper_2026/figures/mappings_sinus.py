@@ -12,7 +12,7 @@ Reference:
 """
 
 
-from scripts.paper_2026.paper_figures.config_sinus import *
+from scripts.paper_2026.figures.config_sinus import *
 from src.blocks.sinus_block.transformations import transform_sin, transform_cylinder_ri
 from src.blocks.sinus_block.block import create_point_grid, create_layers
 from src.engine.cells import create_tri3_cells, create_quad4_cells, create_hex8_cells

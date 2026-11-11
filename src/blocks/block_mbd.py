@@ -14,39 +14,57 @@ Reference:
 import numpy as np
 import pyvista as pv
 
+def _get(block, key):
+    '''read a field of a reference block (dict) or of a Block object'''
+    return block[key] if isinstance(block, dict) else getattr(block, key)
+
+
+def _set(block, key, value):
+    '''write a field of a reference block (dict) or of a Block object'''
+    if isinstance(block, dict):
+        block[key] = value
+    else:
+        setattr(block, key, value)
+
+
 def get_block_matrices(block, q):
     """
     Compute block matrices A_b and p_b.
-    
+
     Args:
-        block: Block object with 'face_groups', 'unit_forces', 'unit_momentum', 'face_areas'
+        block: reference block (dict) or Block object with 'face_groups',
+               'unit_forces', 'unit_momentum' and 'face_areas'
         q: Load pressure
-    
+
     Returns:
-        Block object with 'A_b' and 'p_b' attributes
+        block with 'A_b' and 'p_b'
     """
-    contact_faces = block.face_groups['contact_faces']
-    f_ext_faces = block.face_groups['f_ext_faces']
-    
+    face_groups = _get(block, 'face_groups')
+    unit_forces = _get(block, 'unit_forces')
+    unit_momentum = _get(block, 'unit_momentum')
+
+    contact_faces = face_groups['contact_faces']
+    f_ext_faces = face_groups['f_ext_faces']
+
     # Block array
     A_b = np.hstack([
-        block.unit_forces[contact_faces, :],
-        block.unit_momentum[contact_faces, :]
+        unit_forces[contact_faces, :],
+        unit_momentum[contact_faces, :]
     ]).T
 
     # Right side: sum the normals of the top plane and multiply with a scalar f
     if f_ext_faces.size == 0:
         p_b = np.zeros((6))
     else:
-        A = block.face_areas[f_ext_faces]
+        A = _get(block, 'face_areas')[f_ext_faces]
         f = q * A  # compute force from load pressure q
-        F_b = np.sum(f[:, np.newaxis] * block.unit_forces[f_ext_faces, :], axis=0)
-        M_b = np.sum(f[:, np.newaxis] * block.unit_momentum[f_ext_faces, :], axis=0)
+        F_b = np.sum(f[:, np.newaxis] * unit_forces[f_ext_faces, :], axis=0)
+        M_b = np.sum(f[:, np.newaxis] * unit_momentum[f_ext_faces, :], axis=0)
         p_b = np.hstack([F_b, M_b])
 
-    block.A_b = A_b
-    block.p_b = p_b
-    
+    _set(block, 'A_b', A_b)
+    _set(block, 'p_b', p_b)
+
     return block
 
 
@@ -83,7 +101,7 @@ def get_mbd_data(block):
     unit_momentum = np.cross(lever_vectors, unit_forces)
 
     block['surface'] = surface
-    block['centroid'] = centroid,
+    block['centroid'] = centroid
     block['face_normals'] = face_normals
     block['face_centers'] = face_centers
     block['unit_forces'] = unit_forces
@@ -111,6 +129,20 @@ def extract_block_surface( all_points, n_cells, cells_arr ):
     mesh = pv.UnstructuredGrid(cells_arr, cell_types, all_points)
 
     # Extract the outer surface
-    surface = mesh.extract_surface()
+    surface = extract_surface(mesh)
     
     return surface
+
+
+def extract_surface(mesh):
+    '''
+    Extracts the outer surface of a mesh with the algorithm used for the
+    published results ('dataset_surface'). The face order of the surface
+    defines the order of the contact faces (and of the columns in snaps.txt),
+    so the algorithm is fixed explicitly: newer pyvista versions change the
+    default. Older pyvista versions without the keyword use this algorithm.
+    '''
+    try:
+        return mesh.extract_surface(algorithm="dataset_surface")
+    except TypeError:
+        return mesh.extract_surface()

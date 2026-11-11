@@ -1,22 +1,12 @@
-
 # Planar Assemblies: Analysis Scripts
 
-This directory contains scripts used to produce the **analysis** for planar assemblies.  
-The scripts perform numerical simulations, parameter studies, and post-processing of results.
+This directory contains scripts for the multibody (MBD) analysis of planar
+interlocking assemblies. They rely on the implementation in `src/engine` and
+`src/blocks/planar_block` and must be run from the repository root.
 
-They rely on the main implementation in the repository (`src/engine`, `src/blocks`, etc.) and should be run from the repository root.
-
----
-
-# Overview
-
-The scripts in this directory perform the following tasks:
-
-- Run **single MBD simulations** of planar assemblies
-- **Post-process and visualize** MBD simulation results
-- **Generate Abaqus input files** for quasi-static FEM simulations
-
-The outputs include contact pressure fields, equilibrium checks, and aggregated performance measures used in the publication.
+The planar driver (`src/blocks/planar_block/run_mbd_planar.py`) is separate
+from the driver of the tubular assemblies of the paper (`src/blocks/run_mbd.py`),
+so that changes for planar assemblies do not affect the published results.
 
 ---
 
@@ -24,52 +14,67 @@ The outputs include contact pressure fields, equilibrium checks, and aggregated 
 
 | File | Description |
 |-----|-------------|
-| `config.py` | Central configuration file defining geometry, assembly parameters, boundary conditions, plotting settings, and BVP definitions. |
-| `mbd_planar.py` | Runs a single simulation and optionally performs an interlocking test. Useful for quick experimentation and debugging. |
-| `post_results.py` | Post-processing and plotting of simulation results from the parameter study. |
+| `config.py` | Default block/assembly parameters, plot settings and boundary value problems (`blocks_bvp_config`). |
+| `mbd_planar.py` | Runs single simulations (`run`) or h-sweeps (`h_sweep`): force equilibrium or interlocking test. |
+| `post_results.py` | Aggregated measures (effective area, pressures) of an h-sweep, exported to Excel. |
 
 ---
 
 # Usage
 
-## Run a Single MBD Simulation
+## Run a Simulation
 
 ```bash
 python -m scripts.planar.mbd_planar
 ```
 
-This script:
+Edit the examples at the bottom of `mbd_planar.py`, e.g.
 
-- Builds the block assembly
-- Performs an **interlocking test**
-- Runs the equilibrium/contact analysis
+```python
+run(block_type='versatile', group_name='p4', n_blocks=4, m_blocks=4, ref=2)
+run(block_type='versatile_param', h_value=0.5, group_name='p4', n_blocks=6, m_blocks=6, ref=4)
+run(block_type='brick_inter', bvp='wall_left', n_blocks=5, m_blocks=15, ref=4, group_name='p1_brick')
+run(block_type='versatile', group_name='p4', n_blocks=4, m_blocks=4, mode='interlocking_test')
+```
 
-Parameters such as:
+Arguments that are not given are taken from `config.py`; `config.py` itself is
+not modified by `run`.
 
-- wallpaper group
-- type ob block
-- size of assembly
+| Argument | Values |
+|---|---|
+| `block_type` | `versatile`, `bisquare`, `octahedron`, `brick`, `brick_inter`, `versatile_param`*, `bisquare_param`*, `irr_octahedron`* (* requires `h_value`) |
+| `group_name` | `p1`, `pg`, `p4` (square blocks), `octa`, `irr_octa` (octahedra), `p1_brick` (bricks) |
+| `bvp` | `ceiling` (default), `wall_left`, `wall_right` |
+| `mode` | `force_equilibrium` (default), `interlocking_test` |
 
-can be modified at the top of `mbd_planar.py`.
+## Boundary Value Problems
 
----
+- `ceiling`: load `q` on the top faces (highest z), the bottom faces are free.
+  Blocks in z ∈ [0, 1].
+- `wall_left` / `wall_right` (bricks): the wall lies in the x-y plane (y = height,
+  z = thickness). Load `q` from above on the top row and on the left/right end
+  face of the top row. Front and back are free.
 
-## Post-Processing Results
+Contact faces without a contact partner act as rigid supports (frame). For
+assemblies in which interior blocks have exposed side faces (e.g. octahedra,
+whose side faces are only partially in contact) these faces are currently also
+treated as supports — see `REVIEW_FINDINGS.md`.
+
+## Output
+
+All results of a run are written to
+`./outputs/planar/<block>_<group>_<bvp>_<ref>_<n>x<m>[_h<h>]/`:
+
+- `snaps.txt` — contact pressure, one column per block (NaN padded if blocks
+  have different numbers of contact faces)
+- `info.json` — solver status, residual, timings and the parameters of the run
+- `contact_pressure.html` / `.png` — plots (if enabled in `config.py`)
+
+## Post-Processing
 
 ```bash
 python -m scripts.planar.post_results
 ```
 
-This script:
-
-- reads simulation snapshots
-- computes aggregated measures
-
----
-
-
-## Notes
-
-- All scripts assume they are executed **from the repository root**.
-- Most parameters can be modified either in `config.py` or at the beginning of each script.
-
+Reads the `snaps.txt` files of an h-sweep and writes an Excel file with the
+aggregated measures (requires `pandas` and `xlsxwriter`).

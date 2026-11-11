@@ -16,7 +16,7 @@ from src.blocks.sinus_block.block import get_blocks, group_faces
 from src.blocks.sinus_block.assembly import get_assembly
 from src.blocks.run_mbd import setup_blocks
 from src.engine.util import makeDirIfNotExists, nearest_divisible_by_k
-from src.blocks.post_mbd import analyse_results
+from src.blocks.sinus_block.post_mbd import analyse_results
 from src.engine.plots import plot_assembly_quantity
 
 #### parameters #####################

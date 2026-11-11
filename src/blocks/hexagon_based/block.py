@@ -16,6 +16,7 @@ import numpy as np
 from src.blocks.hexagon_based.transformations import *
 from src.engine.cells import *
 from src.engine.plots import *
+from src.blocks.block_mbd import extract_surface
 
 ########################################################################
 # Point clouds / grids
@@ -244,7 +245,7 @@ def extract_block_surface( all_points, n_cells, cells_arr ):
     mesh = pv.UnstructuredGrid(cells_arr, cell_types, all_points)
 
     # Extract the outer surface
-    surface = mesh.extract_surface()
+    surface = extract_surface(mesh)
     
     return surface
 
@@ -267,7 +268,7 @@ def plot_grouped_faces(surface, cell_ids):
 # construct all block types
 #############################################################################
 
-def get_blocks(config):
+def get_blocks(config, assembly_config=None):
     
     # create the sinus block
     block = create_block(

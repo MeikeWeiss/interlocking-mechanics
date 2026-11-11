@@ -13,7 +13,7 @@ Reference:
 
 
 
-from scripts.paper_2026.paper_figures.config_hexagon import *
+from scripts.paper_2026.figures.config_hexagon import *
 from src.blocks.hexagon_based.transformations import transform_rectangle_to_hexagon, transform_hexagon_edges, transform_cylinder
 from src.blocks.hexagon_based.block import create_point_grid, create_layers
 from src.engine.cells import create_tri3_cells, create_quad4_cells, create_hex8_cells

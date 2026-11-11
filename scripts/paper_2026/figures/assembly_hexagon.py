@@ -12,7 +12,7 @@ Reference:
 """
 
 
-from scripts.paper_2026.paper_figures.config_hexagon import *
+from scripts.paper_2026.figures.config_hexagon import *
 from src.blocks.hexagon_based.block import get_blocks, group_faces
 from src.blocks.hexagon_based.assembly import get_assembly # get_assembly_alternating
 from src.blocks.run_mbd import setup_blocks

@@ -152,8 +152,6 @@ def create_p4(block, nx, ny ):
             bl = init_block(block, offset, grid[c,r], alpha)
             assembly.append(bl)
 
-            bl.face_centers = bl.face_centers
-
             offset['id'] += 1
             offset['nodes'] += bl.n_nodes
             offset['cells'] += bl.n_cells
@@ -273,54 +271,39 @@ def create_octahedron_assembly(block, n, m,h):
 
 
 class Block():
+    '''
+    Placed copy of a reference block: rotated by rot_angle about the z-axis
+    and translated by trans. All arrays are copies, so modifying one block
+    does not affect the others. A_b and p_b are computed in the setup
+    (src/blocks/planar_block/run_mbd_planar.py).
+    '''
 
     def __init__(self, ID, data, trans, rot_angle):
 
         self.ID = ID
         self.data = data
-        
-        # rotation matrix
+
+        # rotation matrix about the z-axis
         Rz = np.array([
             [np.cos(rot_angle), -np.sin(rot_angle), 0],
             [np.sin(rot_angle),  np.cos(rot_angle), 0],
             [0,              0,             1]
         ])
-        # 6x6 block diagonal
-        R6 = np.block([
-            [Rz, np.zeros((3,3))],
-            [np.zeros((3,3)), Rz]
-        ])
-        
-        nodes = data['all_points'] @ Rz.T
-        face_centers = data['face_centers'] @ Rz.T
 
-        if abs(rot_angle) > 0.:
-            self.unit_forces = data['unit_forces'] @ Rz.T
-            self.face_normals = data['face_normals'] @ Rz.T
-            self.unit_momentum = data['unit_momentum'] @ Rz.T
-            self.A_b = R6 @ data['A_b']
-            self.p_b = R6 @ data['p_b']
+        # rotation (vectors) and translation (points)
+        self.nodes = data['all_points'] @ Rz.T + trans
+        self.surface_nodes = self.nodes
+        self.face_centers = data['face_centers'] @ Rz.T + trans
+        self.face_normals = data['face_normals'] @ Rz.T
+        self.unit_forces = data['unit_forces'] @ Rz.T
+        self.unit_momentum = data['unit_momentum'] @ Rz.T
+        self.face_areas = np.array(data['face_areas'], copy=True)
 
-        else:
-            self.face_normals = data['face_normals']
-            self.unit_forces = data['unit_forces']
-            self.unit_momentum = data['unit_momentum']
-            self.A_b = data['A_b']
-            self.p_b = data['p_b']
-
-        # translation
-        nodes = nodes + trans
-        face_centers = face_centers + trans
-                
-        self.nodes = nodes
-        self.surface_nodes = nodes
-        self.face_centers = face_centers
-        
         self.cells_2D = data['cells']['3D']
         self.cells_2D_arr = data['cells_arr']['3D']
 
         self.cells_glob = None
-        
+
         self.n_nodes = len(self.nodes)
         self.n_cells = len(self.cells_2D)
 
@@ -334,7 +317,7 @@ class Block():
         self.contact_partners = {}
 
         self.solutions = {}
-        
+
         return
 
     

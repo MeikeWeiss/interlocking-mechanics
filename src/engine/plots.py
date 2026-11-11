@@ -664,13 +664,12 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
     for bl in assembly:
         cells_idx = bl.face_groups['contact_faces']
         n_surf = len(cells_idx)
-        if bl.data['cells']['3D'][0][0]==8:
-            nodes_idx = [j for i in cells_idx for j in range(i*5, i*5 + 5)]
-        elif len(bl.data['cells']['3D'][0])==3:
-            nodes_idx = [j for i in cells_idx for j in range(i*4, i*4 + 4)]
-        else:
-            raise ValueError("Unsupported cell type. Expected 3 or 4 nodes per cell.")
-        cells_2D_arr = bl.data['surface'].faces[nodes_idx]
+        # surface faces are stored as [n, id_1, ..., id_n]: quads (sine,
+        # hexagon blocks) or triangles (planar blocks)
+        faces = bl.data['surface'].faces
+        stride = faces[0] + 1
+        nodes_idx = [j for i in cells_idx for j in range(i*stride, i*stride + stride)]
+        cells_2D_arr = faces[nodes_idx]
         
         plot_quantity_distr(
             plotter,

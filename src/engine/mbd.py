@@ -109,7 +109,12 @@ def compute_lam( assembly, info, tol_res=1e-6 ):
 ############################################################################
 # Kinematic feasibility
 ############################################################################
-def check_kinematic_feasibility( assembly, info, lp_method='dof' ):
+def check_kinematic_feasibility( assembly, info, lp_method='dof', n_fixed=8 ):
+    '''
+    n_fixed: number of fixed bodies at the end of 'assembly' (frame blocks).
+             Use 0 if the assembly contains no frame blocks (e.g. planar
+             assemblies, where unpaired contact faces act as the frame).
+    '''
 
     t = info['t_cpu']
 
@@ -118,17 +123,21 @@ def check_kinematic_feasibility( assembly, info, lp_method='dof' ):
 
     ### check mobility ###
     if lp_method == 'dof':
-        motion, dq = solve_lp_dof(G.T, 8)
+        motion, dq = solve_lp_dof(G.T, n_fixed)
     elif lp_method == 'wang2018':
-        motion, dq, s, status = wang_interlocking_test(G.T, 8)
+        motion, dq, s, status = wang_interlocking_test(G.T, n_fixed)
     elif lp_method == 'norm2':
-        motion, dq, status = solve_lp_norm2(G.T, 8)
+        motion, dq, status = solve_lp_norm2(G.T, n_fixed)
     elif lp_method == 'mechanism_test':
-        motion, dq, s, status = wang_interlocking_test(G.T, 8)
-        if np.linalg.norm(dq) < 1e-9:
+        motion, dq, s, status = wang_interlocking_test(G.T, n_fixed)
+        if dq is None:
+            print(f"Interlocking test failed (solver status: {status})")
+        elif np.linalg.norm(dq) < 1e-9:
             print("No mechanism (interlocked system)")
         else:
-            mechanism_test(G, f_ext, 8)
+            mechanism_test(G, f_ext, n_fixed)
+    else:
+        raise ValueError(f"Unknown lp_method: {lp_method}")
     
     return
 
@@ -498,6 +507,16 @@ def sparse_matrix_analysis(G, tol=1e-10, max_sv=None):
 # Mobility / Kinematic Feasibility
 ############################################################################
 
+def fixed_dofs_zero(Y, n_fixed, dof_per_body=6):
+    '''
+    Constraints fixing the DOFs of the last n_fixed bodies.
+    Returns an empty list for n_fixed = 0 (note: Y[-0:] would be all of Y).
+    '''
+    if n_fixed <= 0:
+        return []
+    return [Y[-dof_per_body*n_fixed:] == 0]
+
+
 def solve_lp_norm2(B, n_fixed, dof_per_body=6, solver="SCS"):
     """
     Detect feasible motion with the last n_fixed bodies fixed (Y_n = 0).
@@ -508,7 +527,7 @@ def solve_lp_norm2(B, n_fixed, dof_per_body=6, solver="SCS"):
     
     # Constraints
     constraints = [
-        Y[-dof_per_body*n_fixed :] == 0.,  # fixed bodies
+        *fixed_dofs_zero(Y, n_fixed, dof_per_body),  # fixed bodies
         B @ Y >= 0.,                        # non-penetration
         cp.norm2(Y) <= 1.0,  # bound to prevent unbounded solution
     ]
@@ -543,7 +562,7 @@ def solve_lp_dof(B, n_fixed, dof_per_body=6):
 
         constraints = [
             B @ Y >= 0,
-            Y[-fixed:] == 0,
+            *fixed_dofs_zero(Y, n_fixed, dof_per_body),
             Y[i] == 1
         ]
 
@@ -607,7 +626,7 @@ def wang_interlocking_test(B, n_fixed=1, dof_per_body=6, solver="CLARABEL", tol=
 
     constraints = [
         B @ Y >= s,
-        Y[-fixed_dofs:] == 0,
+        *fixed_dofs_zero(Y, n_fixed, dof_per_body),
         Y <= 1,
         Y >= -1
     ]
@@ -664,7 +683,7 @@ def mechanism_test(G, f_ext, n_fixed=1, dof_per_body=6, tol=1e-6):
     constraints = [
         G.T @ dq >= 0,             # kinematic admissibility (motion cone)
         cp.norm1(dq) <= 1,         # bounded set (keeps problem convex)
-        dq[-fixed_dofs:] == 0      # fixed bodies
+        *fixed_dofs_zero(dq, n_fixed, dof_per_body),  # fixed bodies
     ]
 
     # --- MAX problem ---

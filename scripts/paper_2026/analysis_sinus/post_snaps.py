@@ -14,7 +14,7 @@ Reference:
 
 from scripts.paper_2026.analysis_sinus.config import *
 from src.blocks.sinus_block.block import get_blocks, group_faces
-from src.blocks.post_mbd import plot_snaps
+from src.blocks.sinus_block.post_mbd import plot_snaps
 from src.engine.util import makeDirIfNotExists, nearest_divisible_by_k
 
 #### parameters #####################
