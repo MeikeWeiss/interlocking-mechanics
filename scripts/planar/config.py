@@ -40,8 +40,9 @@ assembly_config = {
     # required e.g. for octahedra, whose side faces are only partially in contact)
     'support': 'implicit',
     'frame_blocks': 'boundary', # 'boundary' or list of block indices
-    # 'force': min sum lambda^2 (paper), 'pressure': min integral p^2 (mesh independent)
-    'objective': 'force',
+    # 'pressure': min integral p^2 (mesh independent, default for planar assemblies),
+    # 'force': min sum lambda^2 (as in the paper; only option for contact_method 'matching')
+    'objective': 'pressure',
 }
 
 

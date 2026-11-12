@@ -12,3 +12,5 @@ json_tricks
 # planar post-processing (Excel export)
 pandas
 xlsxwriter
+# web interface (webapp/app.py)
+streamlit>=1.40

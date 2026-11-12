@@ -15,7 +15,8 @@ Getestet mit kleinen Modellen (ohne Plots) in einer separaten Python-3.10-Umgebu
 | 5. Normalen `brick`/`brick_inter` | **behoben**: Normalen nach außen, `unit_forces`-Überschreibungen entfernt, Block-Arrays kopiert, Ebenen aus z-Ausdehnung des Blocks. Ergebnisse identisch zum vorherigen Stand |
 | 6. Kleinere Fehler | **behoben**: Ordnername in `post_results.py`, NaN in planaren Kennzahlen, `out_dir_override`, `requirements.txt`, `errno`, `trimesh`-Import, `centroid`-Tupel, `octahedron_param` |
 | 7. Interlocking-Test (neu gefunden) | **für planar behoben** (`lp_method='cone_mechanism'`), Sinus/Paper unverändert — siehe unten |
-| Methodische Punkte | Zielfunktion als Option `objective='pressure'` verfügbar (Default weiterhin wie im Paper); A_eff/p_eff-Definition offen |
+| Methodische Punkte | **für planar umgesetzt**: Zielfunktion `pressure` als Default, A_eff flächenbasiert, p_eff als Mittel der Blockwerte (siehe `CHANGES.md` §9); Paper-Auswertung unverändert |
+| Weboberfläche | **umgesetzt** (`webapp/`, siehe `CHANGES.md` §10): planar und tubular, nur neue Rechnungen |
 
 ### 7. Interlocking-Test (in Schritt 2 gefunden)
 
@@ -174,7 +175,7 @@ Ziegel-Layout (`p1_brick`) gültig, werden aber für alle BVPs berechnet (KeyErr
 
 ---
 
-## Weboberfläche (Vorschlag)
+## Weboberfläche (Vorschlag, inzwischen umgesetzt: `webapp/`, `CHANGES.md` §10)
 
 Lokale **Streamlit-App**:
 - Sidebar: Blocktyp (h nur bei parametrisierten), Gruppe (nur kompatible), n×m, Verfeinerung,

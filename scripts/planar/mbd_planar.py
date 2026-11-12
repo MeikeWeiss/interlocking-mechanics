@@ -55,7 +55,7 @@ def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=
 
     mode:           'force_equilibrium' or 'interlocking_test'
     support:        'implicit' or 'frame' (see config.py)
-    objective:      'force' or 'pressure'
+    objective:      'pressure' (default) or 'force'
     contact_method: 'intersection' or 'matching'
     """
     # local copies: the configuration in config.py is not modified
@@ -85,6 +85,9 @@ def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=
         a_conf['objective'] = objective
     if contact_method is not None:
         a_conf['contact_method'] = contact_method
+    if a_conf.get('contact_method') == 'matching' and objective is None:
+        # the original method supports only the original objective
+        a_conf['objective'] = 'force'
 
     name = get_run_name(b_conf['type'], a_conf['group'], bvp, b_conf['refinement'],
                         a_conf['n'], a_conf['m'], b_conf['h'],
@@ -100,6 +103,7 @@ def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=
     makeDirIfNotExists(out_dir)
 
     info = new_info()
+    info['out_dir'] = out_dir
     info['parameters'] = {
         'block': b_conf, 'assembly': a_conf, 'bvp': bvp,
     }

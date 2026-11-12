@@ -91,13 +91,13 @@ def test_interlocking(block_config,
 
     # test the kinematic feasibility
     lp_method = assembly_config['lp_method']
-    check_kinematic_feasibility(assembly_all['together'], info, lp_method, n_fixed=n_fixed)
+    result = check_kinematic_feasibility(assembly_all['together'], info, lp_method, n_fixed=n_fixed)
 
     # release memory
     del blocks
     del assembly_all
 
-    return
+    return result
 
 
 def count_frame_blocks(assembly_all):
@@ -194,12 +194,14 @@ def categorize_face_groups(surf_filter, n_faces, f_ext_surf, free_surf):
 
 def plot_and_save_pc(assembly_all, plot_config, out_config, info):
 
-    # Plot the quantity distribution on contact surfaces
-    plot_assembly_quantity(
-        assembly_all[plot_config['assembly_all']],
-        quantity_name='Contact pressure', # 'Contact pressure', 'lam',
-        plt_conf=plot_config,
-    )
+    # Plot the quantity distribution on contact surfaces (skipped if no
+    # output is requested: no window, no file)
+    if plot_config.get('show') or plot_config.get('save') or plot_config.get('html'):
+        plot_assembly_quantity(
+            assembly_all[plot_config['assembly_all']],
+            quantity_name='Contact pressure', # 'Contact pressure', 'lam',
+            plt_conf=plot_config,
+        )
 
     # save contact pressure solution as snapshot matrix
     save_solution(assembly_all['assembly'], out_config)

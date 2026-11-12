@@ -1,0 +1,6 @@
+[browser]
+gatherUsageStats = false
+
+[server]
+# the 3D plots of large assemblies can be big
+maxMessageSize = 1000

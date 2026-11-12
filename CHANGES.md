@@ -143,11 +143,13 @@ wurde als festes Auflager behandelt (ca. 36 % der Auflagerkräfte auf solchen Sc
 
 ## 5. Zielfunktion: `objective='force' | 'pressure'`
 
-- `force` (Default, wie im Paper): min Σλ².
+- `force` (wie im Paper): min Σλ².
 - `pressure`: min Σλ²/A = ∫p² dA.
-- *Warum optional:* Bei unterschiedlich großen Kontaktelementen hängt `force` vom Netz ab
+- *Warum:* Bei unterschiedlich großen Kontaktelementen hängt `force` vom Netz ab
   (Beispiel: mittlerer Druck 0.0060 → 0.0066 bei gemischtem Netz), `pressure` nicht (0.0060 in
-  allen Varianten). Default unverändert, weil es eine methodische Entscheidung ist.
+  allen Varianten).
+- Default für planare Assemblies ist inzwischen `pressure` (siehe Abschnitt 9). Die Paper-Skripte
+  (Sinus/Hexagon, `src/blocks/run_mbd.py`) sind davon nicht betroffen.
 - Kein zulässiges Gleichgewicht (z.B. ref 0: nur eine Punktkraft pro Fuge, keine
   Momentenübertragung) → `equilibrium=False` statt Absturz.
 
@@ -270,3 +272,158 @@ beim Tunnel (Außendruck); der Sinus-Block ist für alle BVPs verzahnt.
 
 Skripte der Prüfung (nicht im Repo, nur für die Auswertung genutzt): Sweep über den
 Parameterraum mit `kinematic_feasibility(G, f, method, n_fixed)` aus `src/engine/mbd.py`.
+
+---
+
+## 9. Flächenbasierte Kennzahlen und Zielfunktion `pressure` (planar)
+
+### 9.1 Was geändert wurde und warum
+
+Die Kennzahlen der planaren Auswertung (`src/blocks/planar_block/post_mbd.py`) hingen bisher von der
+**Anzahl** der Kontaktflächen ab, nicht von ihrer **Fläche**. Bei den planaren Blöcken sind die
+Dreiecke unterschiedlich groß (bei Versatile/Bisquare bis Faktor 2), bei nicht passenden Netzen
+noch stärker. Ein kleines Dreieck zählte dann genauso viel wie ein großes, das Ergebnis hing also
+von der Triangulierung ab. Drei Änderungen:
+
+| | vorher | jetzt | Warum |
+|---|---|---|---|
+| **Zielfunktion** | `force`: min Σλ² | `pressure`: min ∫p² dA = Σλ²/A (Default für planar) | Σλ² bevorzugt kleine Elemente (gleiche Kraft auf halber Fläche = doppelter Druck), die Druckverteilung hängt vom Netz ab. ∫p² dA ist netzunabhängig. |
+| **A_eff** | N_eff / Anzahl Flächen, N_eff = (Σp)²/Σp² | A_eff,b / A_b = (∫p dA)² / (A_b ∫p² dA), Mittel über die Blöcke | Paper-Definition über *Flächeninhalte*. Für gleich große Flächen identisch mit der alten Formel. |
+| **Maske** | die int(N_eff) Flächen mit dem höchsten Druck | Flächen mit dem höchsten Druck, bis ihre Fläche A_eff,b erreicht | wie oben, für gleiche Flächen identisch |
+| **p_eff** | globales Mittel über alle maskierten Flächen aller Blöcke | pro Block flächengewichtetes Mittel auf der Maske, dann arithmetisches Mittel über die Blöcke | Paper-Definition (Mittel der Blockwerte). Das globale Mittel gewichtet Blöcke mit vielen Flächen stärker. Flächengewichtet = Kraft im wirksamen Bereich / A_eff. |
+
+Neu dafür: Jeder planare Lauf schreibt `areas.txt` (Flächen der Kontaktflächen, gleiche Form wie
+`snaps.txt`). Alte Läufe ohne `areas.txt` werden mit gleichen Flächen ausgewertet.
+Die alten Werte stehen weiter in den Excel-Dateien (Spalten `(count)`) und in
+`compute_measures(...)['A_eff_count' | 'p_eff_count']`.
+
+**Nicht betroffen:** Paper-Skripte (Sinus/Hexagon) nutzen `src/blocks/sinus_block/post_mbd.py` und
+`src/blocks/run_mbd.py` mit unveränderten Definitionen und Zielfunktion.
+
+**Prüfung der Netzunabhängigkeit** (künstliches Druckfeld, 50 Flächen × 3 Blöcke): dasselbe Feld
+auf ein ungleichmäßig verfeinertes Netz verteilt → A_eff neu 0.763 → 0.763 (exakt), A_eff alt
+0.763 → 0.754. p_eff ändert sich minimal (0.672 → 0.671), weil die Maske nur ganze Flächen enthält.
+
+### 9.2 Vergleichstabellen
+
+„alt“ = Anzahl/globales Mittel, „neu“ = Fläche/Blockmittel. p_max ist bei beiden Definitionen
+gleich (hängt nur von der Zielfunktion ab). Drücke in MPa bei q = 0.01 MPa.
+
+**Oktaeder** (Decke, Rahmen fixiert, `support='frame'`): Alle Kontaktdreiecke sind exakt gleich
+groß → `force` und `pressure` liefern identische Drücke (max. Abweichung 1.5e-15), A_eff alt = neu.
+Nur p_eff ändert sich (+1–2 %) durch das Mitteln pro Block.
+
+| | A_eff alt | A_eff neu | p_eff alt | p_eff neu | p_max |
+|---|---|---|---|---|---|
+| octahedron 4×4, ref 2 | 0.546 | 0.546 | 0.0318 | 0.0316 | 0.0586 |
+| octahedron 4×4, ref 4 | 0.551 | 0.551 | 0.0314 | 0.0313 | 0.0638 |
+| irr h = 0.2 | 0.403 | 0.403 | 0.2624 | 0.2654 | 0.8451 |
+| irr h = 0.3 | 0.399 | 0.399 | 0.2361 | 0.2392 | 0.8070 |
+| irr h = 0.4 | 0.394 | 0.394 | 0.2062 | 0.2093 | 0.7389 |
+| irr h = 0.5 | 0.390 | 0.390 | 0.1770 | 0.1800 | 0.6535 |
+| irr h = 0.6 | 0.388 | 0.388 | 0.1509 | 0.1536 | 0.5685 |
+| irr h = 0.7 | 0.390 | 0.390 | 0.1288 | 0.1311 | 0.4826 |
+| irr h = 0.8 | 0.397 | 0.397 | 0.1107 | 0.1129 | 0.4350 |
+| irr h = 0.9 | 0.408 | 0.408 | 0.0964 | 0.0984 | 0.3891 |
+| irr h = 1.0 | 0.431 | 0.431 | 0.0851 | 0.0866 | 0.3243 |
+
+**Versatile** (p4, Decke 10×10, ref 4, `support='implicit'`): Dreiecksflächen variieren um Faktor
+1.7–2.0. „bisher“ = Zielfunktion `force` + alte Kennzahlen, „jetzt“ = `pressure` + neue Kennzahlen;
+dazwischen die Einzeleffekte.
+
+| h | A_eff bisher | A_eff (force, neu) | A_eff jetzt | p_eff bisher | p_eff (force, neu) | p_eff jetzt | p_max force | p_max pressure |
+|---|---|---|---|---|---|---|---|---|
+| 1√2/16 | 0.483 | 0.484 | 0.500 | 0.9891 | 0.9442 | 0.9283 | 2.3800 | 2.6853 |
+| 2√2/16 | 0.445 | 0.433 | 0.442 | 0.4634 | 0.4536 | 0.4419 | 1.9307 | 2.1317 |
+| 3√2/16 | 0.419 | 0.396 | 0.384 | 0.3701 | 0.3639 | 0.3568 | 1.9684 | 2.2054 |
+| 4√2/16 | 0.409 | 0.376 | 0.366 | 0.3515 | 0.3461 | 0.3381 | 2.5919 | 2.1707 |
+| 5√2/16 | 0.402 | 0.364 | 0.359 | 0.3485 | 0.3427 | 0.3350 | 2.7663 | 2.3490 |
+| 6√2/16 | 0.395 | 0.357 | 0.352 | 0.3463 | 0.3403 | 0.3339 | 2.7230 | 2.3630 |
+| 7√2/16 | 0.390 | 0.352 | 0.347 | 0.3425 | 0.3366 | 0.3312 | 2.6144 | 2.2944 |
+| 8√2/16 | 0.356 | 0.325 | 0.324 | 0.3351 | 0.3304 | 0.3232 | 2.2325 | 1.9578 |
+
+**Bisquare** (p4, Decke 10×10, ref 4, `support='implicit'`):
+
+| h | A_eff bisher | A_eff (force, neu) | A_eff jetzt | p_eff bisher | p_eff (force, neu) | p_eff jetzt | p_max force | p_max pressure |
+|---|---|---|---|---|---|---|---|---|
+| 1√2/16 | 0.542 | 0.543 | 0.560 | 1.1950 | 1.1893 | 1.1724 | 5.9473 | 5.2060 |
+| 2√2/16 | 0.511 | 0.502 | 0.506 | 0.6415 | 0.6288 | 0.6319 | 3.5160 | 2.9131 |
+| 3√2/16 | 0.469 | 0.461 | 0.463 | 0.4726 | 0.4596 | 0.4613 | 2.9840 | 2.2922 |
+| 4√2/16 | 0.451 | 0.445 | 0.448 | 0.3900 | 0.3810 | 0.3783 | 2.4480 | 1.7952 |
+| 5√2/16 | 0.444 | 0.435 | 0.443 | 0.3455 | 0.3385 | 0.3303 | 2.0674 | 1.4914 |
+| 6√2/16 | 0.439 | 0.427 | 0.440 | 0.3176 | 0.3114 | 0.2989 | 1.8037 | 1.4282 |
+| 7√2/16 | 0.436 | 0.422 | 0.433 | 0.2950 | 0.2906 | 0.2769 | 1.6017 | 1.4034 |
+
+Erzeugt aus `outputs/planar/*_p4_ceiling_4_10x10_h*` (`force`) und `…_pressure` (`pressure`).
+
+**Einordnung:**
+- Bei gleich großen Dreiecken (Oktaeder) ändert sich nur p_eff um 1–2 % (Mittel pro Block).
+- Bei Versatile/Bisquare ändern sich A_eff um bis zu 4 Prozentpunkte und p_eff um bis zu 6 %. Die
+  **Trends über h bleiben gleich**: A_eff und p_eff fallen mit h, bei Bisquare stetig.
+- p_max reagiert am stärksten auf die Zielfunktion, in beide Richtungen: Versatile h = 1√2/16
+  2.38 → 2.69 (+13 %), sonst meist kleiner mit `pressure` (Bisquare bis −27 %, Versatile bis −16 %).
+  Die Spitzen liegen auf einzelnen Elementen, deren Größe bei `force` mitbestimmt, wie viel Kraft
+  sie bekommen. Für p_max ist die Wahl der Zielfunktion also besonders wichtig.
+- Die alten gespeicherten Ergebnisse von Versatile (Ordner ohne `ceiling`, vor diesem Branch
+  gerechnet) weichen ab h = 5√2/16 auch bei gleicher Zielfunktion leicht ab (z.B. A_eff 0.376 statt
+  0.356 bei h = 8√2/16). Ursache sind die Korrekturen aus Abschnitt 2 (Normalen, Flächen), nicht das
+  Kontaktmodell: Mit dem aktuellen Code liefern `matching` und `intersection` identische Drücke
+  (geprüft für h = 4√2/16 und 5√2/16, 4×4, ref 2: max. Abweichung 3e-16).
+
+### 9.3 Diagramme und Dateien
+
+- `scripts/planar/plot_h_sweep.py`: Einfluss von h auf A_eff, p_eff/q, p_max/q, ein Feld pro Größe
+  (keine zwei y-Achsen). Ergebnisse in `outputs/planar/analysis/<block>_h_sweep.png|.pdf` für
+  irreguläres Oktaeder, Versatile und Bisquare.
+  - Achtung beim Oktaeder: `irr_octahedron` normiert die Blockhöhe auf 1, die Grundfläche wächst mit
+    1/h. Ein Teil des Druckanstiegs bei kleinem h ist reine Maßstabswirkung (mehr Last pro Block).
+    Versatile/Bisquare haben dagegen für alle h dieselben Abmessungen (2 × 2 × 1).
+- Excel: `results_irr_octahedron_frame_pressure.xlsx`, `results_versatile_pressure.xlsx`,
+  `results_bisquare_pressure.xlsx` (mit alten Kennzahlen als Zusatzspalten).
+- Neu gerechnete Ordner (`outputs/`, nicht im Repo): alle Oktaeder-Läufe mit `force` und `pressure`,
+  Versatile/Bisquare 10×10 ref 4 mit `force` (Ordner `…_ceiling_…`) und `pressure`
+  (`…_pressure`). Alle 52 Läufe im Gleichgewicht.
+
+### 9.4 Weitere Änderungen in diesem Schritt
+
+- `scripts/planar/mbd_planar.run` gibt den Ergebnisordner in `info['out_dir']` zurück;
+  `contact_method='matching'` setzt die Zielfunktion automatisch auf `force` (nur diese wird dort
+  unterstützt).
+- `scripts/planar/post_results.py`: nutzt die neuen Kennzahlen; Beispiele auf `pressure` bzw.
+  `support='frame'` umgestellt.
+- `src/blocks/run_mbd.py`:
+  - `plot_and_save_pc` plottet nur, wenn `show`, `save` oder `html` gesetzt ist (vorher wurde
+    immer ein VTK-Fenster angelegt, das ohne Bildschirm abstürzt; für die Paper-Skripte ohne
+    Wirkung, dort ist immer eine Ausgabe aktiv).
+  - `test_interlocking` gibt das Ergebnis zurück (vorher `None`).
+
+---
+
+## 10. Web-Oberfläche (`webapp/`)
+
+Wunsch: Parameter einstellen, rechnen und die Ergebnisse (HTML-Plot) direkt ansehen.
+
+- `webapp/app.py` (Streamlit), Start: `python -m streamlit run webapp/app.py` (Windows:
+  `py -3.10 -m streamlit run webapp/app.py`). Anleitung in `webapp/README.md`.
+- **Planar**: alle Blocktypen, Anordnungen, h, n × m, ref, BVP, Kontaktdruck oder
+  Interlocking-Test, Modelloptionen.
+- **Tubular (Paper)**: Sinus- oder Hexagon-Block, BVPs pipe/tunnel/pillar/beam/shaft, n, t, Lagen,
+  Amplitude/Frequenz/Verschiebung, Netz, Last, Interlocking-Test vollständig oder wie im Paper.
+  Neuer Einstiegspunkt `scripts/tubular/run_cli.py` setzt die Parameter genau wie die
+  Paper-Skripte. Geprüft: Sinus pipe n = 4 → A_eff 28.3 %, p_eff 0.189, p_max (Blockmittel) 0.467
+  wie Tabelle 5 im Paper; Sinus pillar identisch zum gespeicherten Paper-Ergebnis (3e-16);
+  Hexagon tunnel → unterdrückter Mechanismus.
+- **Warum jede Rechnung ein eigener Prozess** (`scripts/planar/run_cli.py`,
+  `scripts/tubular/run_cli.py`): Die Configs sind Modul-Dicts, die die Skripte verändern; VTK hält
+  Zustand; ein Absturz (z.B. VTK ohne Bildschirm) reißt so nicht die Seite mit. Die Ausgabe wird
+  live angezeigt.
+- **Nur neue Rechnungen** (auf Wunsch): Jede Rechnung wird in einen neuen Ordner
+  `outputs/webapp/<Datum>_<Uhrzeit>/` geschrieben, vorhandene Ergebnisse werden weder gelesen noch
+  überschrieben. Die Seite zeigt die Rechnungen der aktuellen Sitzung (Liste in der Seitenleiste).
+- Fehlen dem Python der Seite Pakete, zeigt die Seite, welches Python läuft und wie man die Pakete
+  installiert (Anlass: Start mit dem WSL-Python ohne cvxpy).
+- `.streamlit/config.toml`: Nutzungsstatistik von Streamlit aus, größere Nachrichten erlaubt
+  (große 3D-Plots).
+- `requirements.txt`: `streamlit`.
+- Geprüft: alle Formulare und Rechnungen (planar, Sinus, Hexagon, mit/ohne Plots) über die
+  Streamlit-Testumgebung und den echten Server in WSL; von dir unter Windows gestartet.

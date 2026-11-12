@@ -1,6 +1,6 @@
 import os
 from scripts.planar.config import *
-from src.blocks.planar_block.post_mbd import compute_eff_area, measure_pc
+from src.blocks.planar_block.post_mbd import analyse_results
 from scripts.planar.mbd_planar import get_run_name
 import numpy as np
 import pandas as pd
@@ -104,8 +104,8 @@ def save_results_with_charts(df, output_file, show=True):
         chart2_secondary.set_y_axis({'name': 'Average pressure masked', 'major_gridlines': {'visible': False}})
         chart2_main.combine(chart2_secondary)
         
-        worksheet.insert_chart('G2', chart1_main)
-        worksheet.insert_chart('G22', chart2_main)
+        worksheet.insert_chart('I2', chart1_main)
+        worksheet.insert_chart('I22', chart2_main)
     
     if show:
         print(f"Ergebnisse mit 2 Diagrammen (jeweils 2 Y-Achsen) gespeichert in: {output_file}")
@@ -139,26 +139,28 @@ def analyse_results_batch(h_list,
         snaps_file = get_snaps_file_path(type, group, refinement, n, m, h, out_config, bvp,
                                          support, objective)
         
-        try:
-            snaps = np.loadtxt(snaps_file)
-        except FileNotFoundError:
+        if not os.path.exists(snaps_file):
             print(f"h={h:.3f}: Datei nicht gefunden: {snaps_file}")
             continue
-        
-        A_eff = compute_eff_area(snaps, show=False)
-        measures = measure_pc(snaps, A_eff['mask'], show=False)
-        
+
+        # area based measures (see CHANGES.md); without areas.txt (older
+        # runs) all faces are weighted equally
+        res = analyse_results(snaps_file)
+
         results.append({
             'h': h,
-            'Average effective area': A_eff['average'],
-            'Average pressure masked': measures['p_eff_bl_avg'],
-            'Max pressure': measures['p_max'],
-            'Average of max pressure': measures['p_max_bl_avg']
+            'Average effective area': res['A_eff'],
+            'Average pressure masked': res['p_eff'],
+            'Max pressure': res['p_max'],
+            'Average of max pressure': res['p_max_bl_avg'],
+            # original count based definitions, for comparison
+            'Average effective area (count)': res['A_eff_count'],
+            'Average pressure masked (count)': res['p_eff_count'],
         })
-        
+
         if show:
-            print(f"h={h:.3f}: A_eff={A_eff['average']:.4f}, p_avg={measures['p_eff_bl_avg']:.4f}")
-    
+            print(f"h={h:.3f}: A_eff={res['A_eff']:.4f}, p_eff={res['p_eff']:.4f}")
+
     if results:
         df = pd.DataFrame(results).sort_values('h').reset_index(drop=True)
         save_results_with_charts(df, output_file, show)
@@ -173,20 +175,21 @@ def analyse_results_batch(h_list,
 #####################################################################################
 if __name__ == '__main__':
     h_list = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-    
-    # Beispiel 1: Irreguläres Oktaeder
+
+    # Beispiel 1: Irreguläres Oktaeder (Rahmen fixiert)
     df1 = analyse_results_batch(
         h_list=h_list,
         type='irr_octahedron',
         group='irr_octa',
-        output_filename='results_irr_octahedron.xlsx',
+        support='frame',
+        objective='pressure',
+        output_filename='results_irr_octahedron_frame_pressure.xlsx',
         out_dir='./outputs/planar/',
         show=False
     )
 
-    h_list = [np.sqrt(2)/2, 7*np.sqrt(2)/16, 6*np.sqrt(2)/16, 5*np.sqrt(2)/16, 
-              np.sqrt(2)/4, 3*np.sqrt(2)/16, np.sqrt(2)/8, np.sqrt(2)/16]
-    
+    h_list = [k * np.sqrt(2) / 16 for k in range(1, 9)]
+
     # Beispiel 2: Versatile
     df2 = analyse_results_batch(
         h_list=h_list,
@@ -194,7 +197,21 @@ if __name__ == '__main__':
         group='p4',
         n=10,
         m=10,
-        output_filename='results_versatile.xlsx',
+        objective='pressure',
+        output_filename='results_versatile_pressure.xlsx',
+        out_dir='./outputs/planar/',
+        show=False
+    )
+
+    # Beispiel 3: Bisquare
+    df3 = analyse_results_batch(
+        h_list=h_list[:7],
+        type='bisquare_param',
+        group='p4',
+        n=10,
+        m=10,
+        objective='pressure',
+        output_filename='results_bisquare_pressure.xlsx',
         out_dir='./outputs/planar/',
         show=False
     )

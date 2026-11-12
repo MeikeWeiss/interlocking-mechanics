@@ -48,7 +48,7 @@ not modified by `run`.
 | `bvp` | `ceiling` (default), `wall_left`, `wall_right` |
 | `mode` | `force_equilibrium` (default), `interlocking_test` |
 | `support` | `implicit` (default), `frame` — see below |
-| `objective` | `force` (default, as in the paper), `pressure` — see below |
+| `objective` | `pressure` (default), `force` (as in the paper) — see below |
 | `contact_method` | `intersection` (default), `matching` (original method) |
 
 ## Boundary Value Problems
@@ -89,11 +89,12 @@ the triangle; the pressure is then averaged over the face → refine), etc.
   supports. Results (`snaps.txt`) contain only the analysed blocks.
 
 **Objective** (`objective`): the static problem is statically indeterminate;
-`force` selects the contact forces with minimal ‖λ‖² (as in the paper),
-`pressure` minimises ∫p² dA = Σ λ²/A. Both coincide if all contact elements
-have the same area; for elements of different size (non-matching
+`pressure` (default) minimises ∫p² dA = Σ λ²/A, `force` selects the contact
+forces with minimal ‖λ‖² (as in the paper). Both coincide if all contact
+elements have the same area; for elements of different size (non-matching
 triangulations, different face sizes) only `pressure` is independent of the
-mesh.
+mesh. Runs with `objective='pressure'` get the suffix `_pressure` in the folder
+name. `contact_method='matching'` always uses `force`.
 
 ## Interlocking Test
 
@@ -122,6 +123,8 @@ All results of a run are written to
 
 - `snaps.txt` — contact pressure, one column per block (NaN padded if blocks
   have different numbers of contact faces)
+- `areas.txt` — areas of the contact faces, same layout as `snaps.txt`
+  (needed for the area based measures)
 - `info.json` — solver status, residual, timings and the parameters of the run
 - `contact_pressure.html` / `.png` — plots (if enabled in `config.py`)
 
@@ -132,4 +135,17 @@ python -m scripts.planar.post_results
 ```
 
 Reads the `snaps.txt` files of an h-sweep and writes an Excel file with the
-aggregated measures (requires `pandas` and `xlsxwriter`).
+aggregated measures (requires `pandas` and `xlsxwriter`). The measures are
+area based (`src/blocks/planar_block/post_mbd.py`, `compute_measures`):
+
+- `A_eff`: per block A_eff,b / A_b with A_eff,b = (∫p dA)² / ∫p² dA
+  (participation ratio of the pressure field), averaged over the blocks.
+- `p_eff`: per block the area weighted mean pressure on the effective region
+  (faces with the highest pressure until their area reaches A_eff,b), then
+  the arithmetic mean over the blocks (definition of the paper).
+- `p_max`, average of the block maxima.
+
+For equal face areas `A_eff` equals the original count based value. The
+original values (count based A_eff, global p_eff) are written as additional
+columns `(count)`. Runs without `areas.txt` (older runs) are evaluated with
+equal areas.

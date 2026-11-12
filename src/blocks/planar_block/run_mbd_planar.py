@@ -26,9 +26,9 @@ Options in assembly_config:
                       Only with contact_method 'intersection'.
     'frame_blocks':   'boundary' (default, blocks with fewer neighbours than
                       the interior blocks) or a list of block indices
-    'objective':      'force' (default, min sum lambda^2 as in the paper) or
-                      'pressure' (min sum lambda^2/A = integral of p^2,
-                      independent of the size of the contact elements)
+    'objective':      'pressure' (default, min sum lambda^2/A = integral of
+                      p^2, independent of the size of the contact elements)
+                      or 'force' (min sum lambda^2 as in the paper)
 """
 
 import numpy as np
@@ -51,7 +51,7 @@ DEFAULT_OPTIONS = {
     'contact_method': 'intersection',
     'support': 'implicit',
     'frame_blocks': 'boundary',
-    'objective': 'force',
+    'objective': 'pressure',
 }
 
 
@@ -315,8 +315,30 @@ def analyse_contact_pressure(block_config, assembly_config, bvp_config, bvp_type
         info['frame_blocks'] = contacts['frame']
 
     plot_and_save_pc(assembly_all, plot_config, out_config, info)
+    save_areas(assembly_all['assembly'], out_config)
 
     return assembly_all
+
+
+def save_areas(assembly, out_config):
+    '''
+    Saves the areas of the contact faces as areas.txt (same layout as
+    snaps.txt), needed for the area based measures in post_mbd.py.
+    '''
+    columns = []
+    for bl in assembly:
+        p = np.asarray(bl.solutions['Contact pressure'])
+        a = np.asarray(bl.face_areas)[np.asarray(bl.face_groups['contact_faces'], dtype=int)]
+        if len(a) != len(p):
+            print("areas.txt not written: contact faces do not match the pressure")
+            return
+        columns.append(a)
+
+    lengths = {len(a) for a in columns}
+    areas = np.full((max(lengths), len(columns)), np.nan)
+    for j, a in enumerate(columns):
+        areas[:len(a), j] = a
+    np.savetxt(f"{out_config['out_dir']}{out_config['name']}/areas.txt", areas)
 
 
 ############################################################################
