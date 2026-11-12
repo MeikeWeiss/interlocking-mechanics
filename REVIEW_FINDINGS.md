@@ -36,9 +36,26 @@ Getestet mit kleinen Modellen (ohne Plots) in einer separaten Python-3.10-Umgebu
 - Ergebnisse (ref 0–2, implizit und Rahmen): versatile/bisquare/brick_inter/Oktaeder verzahnt,
   einfache Ziegel freier Mechanismus; bei der Wand wird das Abheben der obersten Reihe gefunden
   („suppressed“ durch die Last).
-- Sinus/Hexagon-Skripte nutzen weiterhin `mechanism_test` (Reproduzierbarkeit); für n = 4 lautet
-  das Ergebnis „interlocked“. **Zu prüfen:** ob die Interlocking-Aussagen im Paper mit dem
-  vollständigen Test bestätigt werden.
+- Sinus/Hexagon-Skripte nutzen weiterhin `mechanism_test` (Reproduzierbarkeit). **Geprüft:** Die
+  Interlocking-Aussagen des Papers bestätigen sich mit dem vollständigen Test (Sinus: alle 480
+  Parameterkombinationen aus Tabelle 3 verzahnt; Hexagon: Mechanismus, nur beim Tunnel
+  „suppressed“) — Details in `CHANGES.md`, Abschnitt 8.3.
+
+### 8. Wand-Randbedingung (offen, Entscheidung zur Lagerung ausstehend)
+
+- Schein-Auflager an der Zahnung der Wandenden (Läuferverband): tragen 39 % (`brick`) bzw. 64 %
+  (`brick_inter`) der vertikalen Last.
+- Seitenlast greift je nach Reihenanzahl nicht an (`wall_left` mit m gerade, `wall_right` mit m
+  ungerade: keine `top_left`/`top_right`-Flächen).
+- `brick_inter`: Auflast normal auf geneigte Oberseiten erzeugt horizontale Anteile (x und aus der
+  Ebene), fünfmal größer als die gewollte Seitenlast.
+- Alle Wandenden sind Auflager (starre Seitenwände) → große seitliche Reaktionen (±0.107 bei
+  vertikaler Last 0.1).
+- Ohne Reibung kann eine Horizontallast nicht über waagerechte Lagerfugen in tiefere Reihen
+  übertragen werden.
+- Gewünschte Konfiguration (Stand 12.11.): unten und rechts fest, links teilweise fest, Last von
+  links oben in der Ecke und von oben auf die oberste Reihe — Höhe der linken Fixierung und
+  Reibung noch offen.
 
 ## Kurzfazit
 

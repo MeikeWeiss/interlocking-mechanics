@@ -241,6 +241,32 @@ und nur die inneren Blöcke.
 - Die `_frame`-Ergebnisse wurden mit den neuen Plots neu erzeugt; Kennzahlen unverändert
   (Abweichung < 1e-12).
 
-### 8.3 Verzahnung Sinus-/Hexagon-Block
+### 8.3 Verzahnung Sinus-/Hexagon-Block (Prüfung der Paper-Aussagen)
 
-(läuft, wird ergänzt)
+Geprüft mit dem neuen vollständigen Test (`cone_mechanism`) und zum Vergleich mit dem alten Test
+(`mechanism_test`), jeweils mit korrekt 2·n fixierten Rahmenblöcken bzw. wie im Release fest 8.
+
+**Sinus, gesamter Parameterraum aus Tabelle 3** (480 Kombinationen: a ∈ {10, 15, 20, 25},
+s ∈ {0, 0.5}, f ∈ {1, 1.5, 2}, n ∈ {2…6}, t ∈ {30, 40, 50, 60}; Netz wie in
+`mbd_parameter_para.py`, 12 Lagen, BVP pipe):
+- alle 480 **verzahnt** (kein Mechanismus) — mit allen drei Varianten, keine Abweichung.
+- Bestätigt Tabelle 4 des Papers („locked“ für s = 0 und s = 0.5).
+- Die fest codierten 8 fixierten Blöcke hatten hier keinen Einfluss auf das Ergebnis.
+- Hinweis: Für die Paper-Blöcke wird die Kinematik an den Flächenmittelpunkten geprüft (nicht an
+  den Polygonecken). Das ist eine schwächere Bedingung; „verzahnt“ gilt damit erst recht.
+
+**Fünf BVPs (n = 4, t = 40, 12 Lagen)** — alter und neuer Test identisch:
+
+| BVP | Sinus | Hexagon |
+|---|---|---|
+| pipe | verzahnt | activated (Last treibt Mechanismus) |
+| tunnel | verzahnt | suppressed (Last wirkt dagegen) |
+| pillar | verzahnt | neutral (Last leistet keine Arbeit) |
+| beam | verzahnt | free (beidseitig) |
+| shaft | verzahnt | free (beidseitig) |
+
+Bestätigt die Paper-Aussage: Der Hexagon-Block hat einen Mechanismus („explodiert“) und hält nur
+beim Tunnel (Außendruck); der Sinus-Block ist für alle BVPs verzahnt.
+
+Skripte der Prüfung (nicht im Repo, nur für die Auswertung genutzt): Sweep über den
+Parameterraum mit `kinematic_feasibility(G, f, method, n_fixed)` aus `src/engine/mbd.py`.
