@@ -778,3 +778,8 @@ Option `plot_config['contact_regions']` (Standard `True`).
   den variierten Wert („… · h = 0.500 · h = 0.3 · …“). Der feste Wert des variierten Parameters
   wird jetzt aus der Beschriftung entfernt (`run_study`). Bereits gerechnete Studien dieser Sitzung
   behalten ihre alte Beschriftung.
+- h-Sweep abgeschnittenes Oktaeder (h = 1.0 … 0.2, 6×6, ref 4, Rahmen fest, Plots mit
+  Kontaktbereichen §18): alle im Gleichgewicht (Residuum < 1e-13). `results_octahedron.xlsx`,
+  `analysis/octahedron_h_sweep.png`. Von h = 1 zu h = 0.2: A_eff 48 % → 67 %, p_eff 0.066 → 0.20,
+  p_max 0.23 → 0.43 (q = 0.01). Je stärker abgeschnitten, desto gleichmäßiger, aber höher der Druck
+  (kleinere geneigte Kontaktflächen bei gleichem Volumen).
