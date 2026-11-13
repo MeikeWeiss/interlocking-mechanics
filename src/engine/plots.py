@@ -657,6 +657,29 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
     # Make it discrete with exactly 14 colors
     cmap_n = cmap.resampled(14)
 
+    # colour scale: limits from the config, or (planar config) from a percentile
+    # of the values, so that a few peaks do not compress all other colours;
+    # values above the limit get the colour of the maximum
+    # planar assemblies: plot the contact regions (polygons of the contact
+    # elements with their own pressure) instead of the faces, if available
+    use_regions = (plt_conf.get('contact_regions', False) and quantity_name == 'Contact pressure'
+                   and all('contact_regions' in bl.solutions for bl in assembly))
+
+    clim, above_color = plt_conf['clim'], None
+    if clim is None and plt_conf.get('clim_percentile'):
+        if use_regions:
+            vals = np.concatenate([bl.solutions['contact_regions'][1] for bl in assembly] or [np.zeros(1)])
+            vals = vals if len(vals) else np.zeros(1)
+        else:
+            vals = np.concatenate([np.asarray(bl.solutions[quantity_name], dtype=float).ravel()
+                                   for bl in assembly if len(bl.face_groups['contact_faces'])]
+                                  or [np.zeros(1)])
+        vmax = float(np.percentile(vals, plt_conf['clim_percentile']))
+        if vmax > 0 and vmax < vals.max():
+            # values above the limit are clamped to the colour of the maximum
+            # (no extra colour, no "above" entry in the scalar bar)
+            clim = [0., vmax]
+
     # Plot
     plotter = pv.Plotter(off_screen=not plt_conf['show'], window_size=plt_conf['window_size'])
 
@@ -670,6 +693,10 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
         # them stay visible when only parts of the faces are in contact
         if plt_conf.get('show_free_faces', False):
             plot_block_free_faces(plotter, bl, plt_conf)
+
+        if use_regions:
+            plot_contact_regions(plotter, bl.solutions['contact_regions'], quantity_name, cmap, clim, above_color)
+            continue
 
         if n_surf == 0:
             # e.g. frame blocks of planar assemblies without contact to the analysed blocks
@@ -689,7 +716,8 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
             bl.solutions[quantity_name],
             quantity_name,
             cmap,
-            plt_conf['clim'],
+            clim,
+            above_color,
         )
 
         offset_contact_faces += n_surf
@@ -704,6 +732,47 @@ def plot_assembly_quantity(assembly, quantity_name, plt_conf):
     del plotter
     
     return
+
+
+def sharp_edges(mesh, feature_angle):
+    '''
+    Boundary and sharp edges of a surface mesh. The triangles of the planar
+    block geometries are not consistently ordered (the outward normals of the
+    computation are determined separately); without reordering, the seams
+    between oppositely ordered coplanar triangles would appear as edges.
+    '''
+    surf = mesh if isinstance(mesh, pv.PolyData) else mesh.extract_surface()
+    surf = surf.compute_normals(consistent_normals=True, auto_orient_normals=False,
+                                split_vertices=False, cell_normals=True, point_normals=False)
+    return surf.extract_feature_edges(boundary_edges=True, feature_edges=True,
+                                      manifold_edges=False, non_manifold_edges=False,
+                                      feature_angle=feature_angle)
+
+
+def plot_contact_regions(plotter, regions, quantity_name, cmap, clim, above_color=None):
+    '''
+    Contact regions of a block: every polygon (convex, from the intersection of
+    two contact faces) coloured with its own pressure. Faces that are only
+    partially in contact are not drawn, so the colour does not depend on how
+    the triangulation cuts the contact region.
+    '''
+    polys, values = regions
+    if not len(polys):
+        return
+    pts, cells, vals = [], [], []
+    n = 0
+    for poly, v in zip(polys, values):
+        poly = np.asarray(poly, dtype=float)
+        k = len(poly)
+        pts.append(poly)
+        for t in range(1, k - 1):          # fan triangulation of the convex polygon
+            cells.append([3, n, n + t, n + t + 1])
+            vals.append(v)
+        n += k
+    mesh = pv.PolyData(np.vstack(pts), np.hstack(cells).astype(np.int64))
+    mesh.cell_data[quantity_name] = np.asarray(vals)
+    plotter.add_mesh(mesh, scalars=quantity_name, cmap=cmap, clim=clim, above_color=above_color,
+                     show_edges=False, opacity=1.0, lighting=False)
 
 
 def plot_block_free_faces(plotter, bl, plt_conf):
@@ -726,9 +795,7 @@ def plot_block_free_faces(plotter, bl, plt_conf):
 
     # edges of the block (sharp edges of the whole surface)
     full = pv.PolyData(bl.surface_nodes, faces)
-    edges = full.extract_feature_edges(boundary_edges=True, feature_edges=True,
-                                       manifold_edges=False, non_manifold_edges=False,
-                                       feature_angle=20)
+    edges = sharp_edges(full, feature_angle=20)
     plotter.add_mesh(edges, color='black', line_width=plt_conf.get('line_width', 2))
 
     return
@@ -740,6 +807,7 @@ def plot_quantity_distr(plotter,
                         quantity_name,
                         cmap,
                         clim,
+                        above_color=None,
                         ):
     
     # Create PyVista mesh
@@ -758,6 +826,7 @@ def plot_quantity_distr(plotter,
         scalars=quantity_name,
         cmap=cmap,
         clim=clim,  # set your colormap limits here
+        above_color=above_color,  # values above clim (only with clim_percentile)
         show_edges=False,
         color='skyblue',
         opacity=1.0,
@@ -765,12 +834,7 @@ def plot_quantity_distr(plotter,
     )
 
     # Extract feature edges (sharp edges, boundaries, non-manifold edges)
-    feature_edges = mesh.extract_feature_edges(
-        boundary_edges=True,      # extract boundary edges
-        feature_edges=True,       # extract sharp edges
-        manifold_edges=False,     # extract manifold edges
-        feature_angle=40          # angle threshold in degrees
-    )
+    feature_edges = sharp_edges(mesh, feature_angle=40)
 
     plotter.add_mesh(feature_edges, color="black", line_width=2)
     

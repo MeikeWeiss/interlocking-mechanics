@@ -39,7 +39,7 @@ assembly_config = {
     # 'frame' (frame blocks are fixed, other faces without contact are free;
     # required e.g. for octahedra, whose side faces are only partially in contact)
     'support': 'implicit',
-    'frame_blocks': 'boundary', # 'boundary' or list of block indices
+    'frame_blocks': 'boundary', # 'boundary', 'perimeter' (also blocks touching the boundary at a vertex, starfish) or list of block indices
     # 'pressure': min integral p^2 (mesh independent, default for planar assemblies),
     # 'force': min sum lambda^2 (as in the paper; only option for contact_method 'matching')
     'objective': 'pressure',
@@ -79,6 +79,10 @@ plot_config  = {
     'views': ['pers'], # None, 'xy', 'yx',['xy', ]
     'parallel': False, # parallel projection (perspective): True
     'clim': None, # color map limits: None, [vmin, vmax]
+    # with clim None: upper limit = this percentile of the pressures, values
+    # above get the colour of the maximum (a few peaks would otherwise compress
+    # all colours); None: [min, max]
+    'clim_percentile': 99,
     'assembly_all': 'together', # which part of the assembly to plot: 'together' (incl. frame), 'assembly'
     'zoom': 1.0,
     # faces without contact: grey (color_free), frame blocks in color_frame,
@@ -86,6 +90,10 @@ plot_config  = {
     'show_free_faces': True,
     'color_free': 'lightgrey',
     'opacity_free': 0.25, # transparent, so that the contact faces between the blocks stay visible
+    # planar assemblies: colour the contact regions (polygons of the contact elements with their
+    # own pressure) instead of the faces: faces that are only partially in contact (e.g. octahedra)
+    # are otherwise shown with the pressure averaged over the whole face. snaps.txt is unchanged.
+    'contact_regions': True,
 }
 
 

@@ -35,7 +35,8 @@ run(block_type='versatile', group_name='p4', n_blocks=4, m_blocks=4, ref=2)
 run(block_type='versatile_param', h_value=0.5, group_name='p4', n_blocks=6, m_blocks=6, ref=4)
 run(block_type='brick_inter', bvp='wall_left', n_blocks=5, m_blocks=15, ref=4, group_name='p1_brick')
 run(block_type='versatile', group_name='p4', n_blocks=4, m_blocks=4, mode='interlocking_test')
-run(block_type='octahedron', group_name='octa', n_blocks=6, m_blocks=6, ref=3, support='frame')
+run(block_type='octahedron', h_value=0.5, group_name='octa', n_blocks=6, m_blocks=6, ref=3, support='frame')
+run(block_type='starfish', h_value=8/20, group_name='p6', n_blocks=2, ref=3)
 ```
 
 Arguments that are not given are taken from `config.py`; `config.py` itself is
@@ -43,13 +44,74 @@ not modified by `run`.
 
 | Argument | Values |
 |---|---|
-| `block_type` | `versatile`, `bisquare`, `octahedron`, `brick`, `brick_inter`, `versatile_param`*, `bisquare_param`*, `irr_octahedron`* (* requires `h_value`) |
-| `group_name` | `p1`, `pg`, `p4` (square blocks), `octa`, `irr_octa` (octahedra), `p1_brick` (bricks) |
-| `bvp` | `ceiling` (default), `wall_left`, `wall_right` |
+| `block_type` | `versatile`, `bisquare`, `brick`, `brick_inter`, `versatile_param`*, `tortuga`* (parameterised bisquare), `octahedron`*, `starfish`* (* requires `h_value`) |
+| `group_name` | `p1`, `pg`, `p4` (versatile; bisquare and tortuga only `p4`, with `p1`/`pg` the bisquare blocks overlap), `octa` (octahedra), `p1_brick` (bricks), `p6` (starfish). Orientation of p1/pg/p4 as in Goertzen et al. (2025) |
+| `bvp` | `ceiling` (default), `wall_left`, `wall_right` (walls: model still open, see `REVIEW_FINDINGS.md`) |
 | `mode` | `force_equilibrium` (default), `interlocking_test` |
 | `support` | `implicit` (default), `frame` — see below |
 | `objective` | `pressure` (default), `force` (as in the paper) — see below |
 | `contact_method` | `intersection` (default), `matching` (original method) |
+
+## Octahedron (cut)
+
+`octahedron` (`src/blocks/planar_block/geometry.py`, construction as in the
+script `cut_octahedra_volume`): middle part of a regular octahedron.
+
+- Regular octahedron (bottom and top face parallel) with the volume of the
+  versatile block (2 in the normalised units; 0.016 in the original script).
+- **`h_value` = kept fraction of the height** (frac): the part between
+  z1 = (1 − h)/2·H and H − z1 is kept (hexagonal bottom and top, 6 planar
+  trapezoids). h = 1 is the full octahedron (default if `h_value` is not given). Values of the CIRP paper:
+  1.0, 0.9, …, 0.2.
+- Then scaled in z only, so that the volume is again 2. The x-y geometry and
+  the lattice of the assembly do not depend on h.
+- `group_name='octa'`: m rows (x) of n blocks (y), every second row shifted,
+  translations only (as `octahedron_interlocking`). Use `support='frame'`:
+  the frame (first/last row and column) is fixed, for 6×6 20 frame and 16
+  inner blocks. The gap of 1e-5 of the original script is left out (exact
+  contact detection).
+- Replaces the former `octahedron` (height 1, no parameter) and
+  `irr_octahedron`/`irr_octa`.
+
+## Starfish Block
+
+Block of Schnelle et al. (2026), *Influence of a generative parameter on the
+mechanical performance of topological interlocking assemblies of a hexagonal
+block*, Procedia CIRP 142, 446–450 (`starfish.pdf`), implemented in
+`src/blocks/planar_block/geometry.py` (`starfish`) and
+`src/blocks/planar_block/assembly.py` (`create_p6`).
+
+- Wallpaper group p6, fundamental domain: equilateral triangle. On every edge
+  the points at ¼ and ¾ are moved by d normal to the edge (¼ inwards, ¾
+  outwards, counterclockwise), the deformed triangle is again a fundamental
+  domain. Bottom (z = 0): triangle, top (z = 1): deformed triangle, i.e. the
+  load of `ceiling` acts on the deformed side as in the paper.
+- Scaled to height 1 with the proportions of the paper (height 20 mm, area
+  800 mm², a = 42.9829 mm → a = 2.149): **`h_value` = d / 20 mm**, admissible
+  0 ≤ h < √3a/4 = 0.9306 (d < 18.6 mm). Paper values d = 1 … 11, 15, 18.5 mm
+  → h = 0.05 … 0.55, 0.75, 0.925. Volume 2 as the versatile block.
+- Side surfaces: linear interpolation between corresponding points of bottom
+  and top; the non-planar quadrilaterals are split into 4 triangles at their
+  centre, so neighbouring blocks have identical contact surfaces (all contact
+  elements are matching triangle pairs).
+- `group_name='p6'`: hexagon of side `n_blocks` (6n² blocks, `m_blocks` is
+  ignored and set to n).
+- Support model as for the versatile block (`support='implicit'`, default):
+  the blocks fit without gaps, so the outer faces act as the rigid frame.
+  **n = 2 is the assembly of the paper** (24 inner blocks; the 30 fixed frame
+  blocks of the paper are replaced by the rigid boundary). Checked: n = 2
+  `implicit` and n = 3 `support='frame'` (30 frame blocks) give identical
+  pressures (difference < 1e-14) and the same interlocking result.
+- `support='frame'` still works; for p6 the default is then
+  `frame_blocks='perimeter'` (all blocks touching the boundary, also only at
+  a corner — `boundary` would give only the 18 blocks with an edge on the
+  boundary).
+- Interlocking test: h = 0 is not interlocked (sliding modes), every h > 0 is
+  interlocked, as stated in the paper.
+- Note: the rigid block model gives contact pressures that decrease
+  monotonically with d; the reversal above d ≈ 10 mm in the FEM results of the
+  paper is caused by stress concentrations in thin regions of the blocks,
+  which a rigid model cannot capture.
 
 ## Boundary Value Problems
 
@@ -93,8 +155,8 @@ the triangle; the pressure is then averaged over the face → refine), etc.
 forces with minimal ‖λ‖² (as in the paper). Both coincide if all contact
 elements have the same area; for elements of different size (non-matching
 triangulations, different face sizes) only `pressure` is independent of the
-mesh. Runs with `objective='pressure'` get the suffix `_pressure` in the folder
-name. `contact_method='matching'` always uses `force`.
+mesh. Runs with `objective='force'` get the suffix `_force` in the folder name.
+`contact_method='matching'` always uses `force`.
 
 ## Interlocking Test
 
@@ -119,7 +181,9 @@ as interlocked.
 ## Output
 
 All results of a run are written to
-`./outputs/planar/<block>_<group>_<bvp>_<ref>_<n>x<m>[_h<h>]/`:
+`./outputs/planar/<block>_<group>_<bvp>_<ref>_<n>x<m>[_h<h>][_frame][_force]/`
+(suffixes only for non-default options: `_frame` for `support='frame'`,
+`_force` for `objective='force'`):
 
 - `snaps.txt` — contact pressure, one column per block (NaN padded if blocks
   have different numbers of contact faces)

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 def get_snaps_file_path(type, group, refinement, n, m, h, out_config, bvp='ceiling',
-                        support='implicit', objective='force'):
+                        support='implicit', objective='pressure'):
 
     # same folder name as in scripts/planar/mbd_planar.py
     out_config['name'] = get_run_name(type, group, bvp, refinement, n, m, h, support, objective)
@@ -112,7 +112,7 @@ def save_results_with_charts(df, output_file, show=True):
 
 
 def analyse_results_batch(h_list, 
-                          type='irr_octahedron', 
+                          type='octahedron', 
                           group='octa', 
                           refinement=4, 
                           n=6, 
@@ -121,7 +121,7 @@ def analyse_results_batch(h_list,
                           out_dir='./outputs/planar/',
                           bvp='ceiling',
                           support='implicit',
-                          objective='force',
+                          objective='pressure',
                           show=True):
     
     out_config['out_dir'] = out_dir
@@ -174,16 +174,16 @@ def analyse_results_batch(h_list,
 # Main
 #####################################################################################
 if __name__ == '__main__':
-    h_list = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    h_list = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
 
-    # Beispiel 1: Irreguläres Oktaeder (Rahmen fixiert)
+    # Beispiel 1: Abgeschnittenes Oktaeder (Rahmen fixiert), h = behaltener Anteil der Höhe
     df1 = analyse_results_batch(
         h_list=h_list,
-        type='irr_octahedron',
-        group='irr_octa',
+        type='octahedron',
+        group='octa',
         support='frame',
         objective='pressure',
-        output_filename='results_irr_octahedron_frame_pressure.xlsx',
+        output_filename='results_octahedron.xlsx',
         out_dir='./outputs/planar/',
         show=False
     )
@@ -198,20 +198,33 @@ if __name__ == '__main__':
         n=10,
         m=10,
         objective='pressure',
-        output_filename='results_versatile_pressure.xlsx',
+        output_filename='results_versatile.xlsx',
         out_dir='./outputs/planar/',
         show=False
     )
 
-    # Beispiel 3: Bisquare
+    # Beispiel 3: Tortuga (parametrisierter Bisquare)
     df3 = analyse_results_batch(
         h_list=h_list[:7],
-        type='bisquare_param',
+        type='tortuga',
         group='p4',
         n=10,
         m=10,
         objective='pressure',
-        output_filename='results_bisquare_pressure.xlsx',
+        output_filename='results_tortuga.xlsx',
+        out_dir='./outputs/planar/',
+        show=False
+    )
+
+    # Beispiel 4: Starfish (p6), Sechseck n = 2 = Assembly von Schnelle et al. (2026), h = d / 20 mm
+    df4 = analyse_results_batch(
+        h_list=[d / 20 for d in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 18.5)],
+        type='starfish',
+        group='p6',
+        n=2,
+        m=2,
+        objective='pressure',
+        output_filename='results_starfish.xlsx',
         out_dir='./outputs/planar/',
         show=False
     )

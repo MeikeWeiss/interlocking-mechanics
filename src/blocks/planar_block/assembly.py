@@ -9,6 +9,21 @@ from src.blocks.planar_block.meshing_mbd import *
 
 # Square centered around (0,0) with edge length Sqrt(2) and rotated by 45 degrees
 
+# Rotation of the whole assembly about the z-axis, so that p1, pg and p4 have the
+# same orientation as in Goertzen et al. (2025), IJSS 306, 113102 (Figs. 6-8, 12, 13):
+# determined from the load transfer onto the frame (which frame edges and which
+# frame blocks carry load). A rotation does not change the mechanics of the
+# assembly, only its position in the coordinate system.
+GROUP_ROTATION = {'p1': np.pi / 2, 'pg': np.pi, 'p4': 0.}
+# start angle of the p4 arrangement (see create_p4); 0 or pi give valid assemblies
+P4_START_ANGLE = np.pi   # loaded frame blocks as in the Interlocking Flows (Fig. 6)
+
+
+def rotate_placement(pos, alpha, phi):
+    '''position and rotation angle of a block after rotating the assembly by phi'''
+    R = np.array([[np.cos(phi), -np.sin(phi)], [np.sin(phi), np.cos(phi)]])
+    return R @ np.asarray(pos, dtype=float), alpha + phi
+
 def get_assembly(blocks, assembly_config, block_config):
     n = assembly_config['n']
     m = assembly_config['m']
@@ -23,9 +38,9 @@ def get_assembly(blocks, assembly_config, block_config):
     elif group == 'p1_brick':
         assembly, offset = create_p1_brick(blocks['block'], n, m)
     elif group == 'octa':
-        assembly, offset = create_octahedron_assembly(blocks['block'], n, m, block_config['h'])
-    elif group == 'irr_octa':
-        assembly, offset = create_irr_octahedron_assembly(blocks['block'], n, m, block_config['h'])
+        assembly, offset = create_octahedron_assembly(blocks['block'], n, m)
+    elif group == 'p6':
+        assembly, offset = create_p6(blocks['block'], n)
     else:
         raise ValueError(f"Unknown group: {group}")
 
@@ -59,7 +74,8 @@ def create_p1(block, nx, ny ):
     
     for pos in ij:
         
-        bl = init_block(block, offset, pos, alpha=0.)
+        pos, alpha = rotate_placement(pos, 0., GROUP_ROTATION['p1'])
+        bl = init_block(block, offset, pos, alpha)
         assembly.append(bl)
 
         offset['id'] += 1
@@ -99,7 +115,8 @@ def create_pg(block, nx, ny ):
             else:
                 alpha = np.pi
             
-            bl = init_block(block, offset, grid[c,r], alpha)
+            pos, alpha = rotate_placement(grid[c, r], alpha, GROUP_ROTATION['pg'])
+            bl = init_block(block, offset, pos, alpha)
             assembly.append(bl)
 
             offset['id'] += 1
@@ -109,7 +126,20 @@ def create_pg(block, nx, ny ):
     return assembly, offset
 
 
-def create_p4(block, nx, ny ):
+def create_p4(block, nx, ny, a0=None):
+    '''
+    p4 arrangement: the four blocks around a 4-fold rotation centre are rotated
+    by a0, a0 + 90°, a0 + 180°, a0 + 270° in counterclockwise order (as their
+    positions). With an even number of blocks the centre of the assembly is a
+    4-fold centre, as in Goertzen et al. (2025), Figs. 6 and 12 ("X" of long
+    joints through the centre).
+
+    Before (until 2026-11-12) the angles were assigned in clockwise order
+    (-90° per step): the arrangement tiled the plane, but was only 2-fold
+    symmetric about the centre of the assembly.
+    '''
+    if a0 is None:
+        a0 = P4_START_ANGLE
 
     assembly = []
     offset = {
@@ -118,38 +148,20 @@ def create_p4(block, nx, ny ):
         'cells': 0,
     }
 
-    grid = np.zeros((nx, ny, 2))
-
     # Define rotation matrix for 45 degrees (π/4 radians)
     theta = np.pi / 4
     R = np.array([[np.cos(theta), -np.sin(theta)],
                   [np.sin(theta),  np.cos(theta)]])
 
-    # Example: fill with coordinates (x, y, z)
-    for r in range(ny):
-        for c in range(nx):
-            point = np.array([np.sqrt(2)*c, np.sqrt(2)*r])
-            rotated_point = R @ point
-            grid[c, r] = rotated_point
+    # position in the 2x2 cell -> number of quarter turns (counterclockwise)
+    quarter_turns = {(0, 0): 0, (1, 0): 1, (1, 1): 2, (0, 1): 3}
 
     for r in range(ny):
         for c in range(nx):
-            if c % 2:  # every second column (odd indices)
-                
-                if r % 2:
-                    alpha = np.pi/2.
-                else:
-                    alpha = np.pi
-                
-            else:
-
-                if r % 2:
-                    alpha = 0.
-                else:
-                    alpha = -np.pi/2.
-                
-            
-            bl = init_block(block, offset, grid[c,r], alpha)
+            pos = R @ np.array([np.sqrt(2)*c, np.sqrt(2)*r])
+            alpha = a0 + quarter_turns[(c % 2, r % 2)] * np.pi / 2.
+            pos, alpha = rotate_placement(pos, alpha, GROUP_ROTATION['p4'])
+            bl = init_block(block, offset, pos, alpha)
             assembly.append(bl)
 
             offset['id'] += 1
@@ -157,6 +169,58 @@ def create_p4(block, nx, ny ):
             offset['cells'] += bl.n_cells
 
     return assembly, offset
+
+
+def create_p6(block, n, a=None):
+    '''
+    p6 arrangement of the starfish block: hexagon of side n (in triangle edge
+    lengths) of 6 n^2 blocks, centred at a 6-fold rotation centre (origin).
+
+    The reference block has its 6-fold vertex at the origin. Around every
+    6-fold centre c of the lattice (spacing a sqrt(3)) six blocks are placed,
+    rotated by k * 60 deg about c. With support='implicit' (as for the
+    versatile block) n = 2 gives the assembly of Schnelle et al. (2026): the 24
+    inner blocks, the outer faces act as the rigid frame. This is identical to
+    n = 3 with support='frame' and frame_blocks='perimeter' (30 fixed frame
+    blocks as in the paper).
+    '''
+    from src.blocks.planar_block.geometry import STARFISH_EDGE
+    if a is None:
+        a = STARFISH_EDGE
+
+    u = np.array([1.5 * a, np.sqrt(3.) / 2. * a])
+    v = np.array([0., np.sqrt(3.) * a])
+    # centroid of the reference triangle relative to its 6-fold vertex
+    g0 = np.array([a / 2., a * np.sqrt(3.) / 6.])
+    # inside the hexagon with corners n a (cos k 60, sin k 60): apothem n a sqrt(3)/2
+    normals = [np.array([np.cos(t), np.sin(t)]) for t in (np.pi / 6, np.pi / 2, 5 * np.pi / 6)]
+    apothem = n * a * np.sqrt(3.) / 2.
+
+    placements = []
+    for i in range(-2 * n - 1, 2 * n + 2):
+        for j in range(-2 * n - 1, 2 * n + 2):
+            c = i * u + j * v
+            for k in range(6):
+                alpha = k * np.pi / 3.
+                R = np.array([[np.cos(alpha), -np.sin(alpha)], [np.sin(alpha), np.cos(alpha)]])
+                g = c + R @ g0
+                if all(abs(g @ w) < apothem for w in normals):
+                    placements.append((np.linalg.norm(g), np.arctan2(g[1], g[0]) % (2 * np.pi), c, alpha))
+
+    # numbering from the centre outwards
+    placements.sort(key=lambda t: (round(t[0], 9), round(t[1], 9)))
+
+    assembly = []
+    offset = {'id': 0, 'nodes': 0, 'cells': 0}
+    for _, _, c, alpha in placements:
+        bl = init_block(block, offset, c, alpha)
+        assembly.append(bl)
+        offset['id'] += 1
+        offset['nodes'] += bl.n_nodes
+        offset['cells'] += bl.n_cells
+
+    return assembly, offset
+
 
 def create_p1_brick(block, nx, ny ):
 
@@ -207,55 +271,34 @@ def create_grid(nx, ny):
 
     return rotated_points.T
 
-def create_irr_octahedron_assembly(block, n, m, h):
-  
-    edge_length = np.sqrt(4. / np.sqrt(3.)) *1/h # np.sqrt(4. / np.sqrt(3.)) *1/h, np.sqrt(3) / np.sqrt(2)  # regulär, für Höhe 1
+def create_octahedron_assembly(block, n, m, edge_length=None):
+    '''
+    Layer of (cut) octahedra, all with the same orientation (translations
+    only), as octahedron_interlocking of the original script: m rows in x,
+    n blocks per row in y, every second row shifted by half a block.
+
+    The lattice is determined by the edge length of the full octahedron (the
+    cut and the scaling in z do not change the x-y geometry). The gap of the
+    original script (1e-5) is left out: the contacts are detected exactly.
+    The frame of the original script (first/last row and column) is the
+    frame of support='frame' with frame_blocks='boundary'.
+    '''
+    from src.blocks.planar_block.geometry import octahedron_edge_length
+    if edge_length is None:
+        edge_length = octahedron_edge_length()
     h = np.sqrt(3) / 2 * edge_length
 
     assembly = []
     offset = {'id': 0, 'nodes': 0, 'cells': 0}
 
-    for i in range(m):        # Zeilen
-        for j in range(n):    # Spalten
-
+    for i in range(m):        # rows
+        for j in range(n):    # columns
             x_translation = i * 1.5 * edge_length / 2
             y_translation = j * h
             if i % 2 != 0:
                 y_translation -= h / 2
 
-            position = np.array([x_translation, y_translation])  # nur 2D, wie in create_p4
-            alpha = 0.0  # keine Rotation -- siehe Hinweis unten
-
-            bl = init_block(block, offset, position, alpha)
-            assembly.append(bl)
-
-            offset['id'] += 1
-            offset['nodes'] += bl.n_nodes
-            offset['cells'] += bl.n_cells
-
-    return assembly, offset
-
-
-def create_octahedron_assembly(block, n, m,h):
-  
-    edge_length = np.sqrt(3) / np.sqrt(2) # np.sqrt(4. / np.sqrt(3.)) *1/h, np.sqrt(3) / np.sqrt(2)  # regulär, für Höhe 1
-    h = np.sqrt(3) / 2 * edge_length
-
-    assembly = []
-    offset = {'id': 0, 'nodes': 0, 'cells': 0}
-
-    for i in range(m):        # Zeilen
-        for j in range(n):    # Spalten
-
-            x_translation = i * 1.5 * edge_length / 2
-            y_translation = j * h
-            if i % 2 != 0:
-                y_translation -= h / 2
-
-            position = np.array([x_translation, y_translation])  # nur 2D, wie in create_p4
-            alpha = 0.0  # keine Rotation -- siehe Hinweis unten
-
-            bl = init_block(block, offset, position, alpha)
+            bl = init_block(block, offset, np.array([x_translation, y_translation]), 0.0)
             assembly.append(bl)
 
             offset['id'] += 1

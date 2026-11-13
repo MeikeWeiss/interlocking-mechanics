@@ -25,7 +25,8 @@ Options in assembly_config:
                       frame block, all other faces without contact are free.
                       Only with contact_method 'intersection'.
     'frame_blocks':   'boundary' (default, blocks with fewer neighbours than
-                      the interior blocks) or a list of block indices
+                      the interior blocks), 'perimeter' (blocks touching the
+                      outer boundary, also at a vertex) or a list of indices
     'objective':      'pressure' (default, min sum lambda^2/A = integral of
                       p^2, independent of the size of the contact elements)
                       or 'force' (min sum lambda^2 as in the paper)
@@ -33,6 +34,7 @@ Options in assembly_config:
 
 import numpy as np
 import scipy.sparse as sp
+from scipy.spatial import cKDTree
 import cvxpy as cp
 
 from src.engine.mbd import (compute_contact_pressure, check_kinematic_feasibility,
@@ -134,14 +136,38 @@ def neighbours(n_blocks, elements):
     return nb
 
 
-def select_frame(n_blocks, elements, frame_blocks='boundary'):
-    '''indices of the frame blocks'''
+def select_frame(n_blocks, elements, frame_blocks='boundary', blocks=None, coverage=None):
+    '''
+    indices of the frame blocks:
+        'boundary':  blocks with fewer contact neighbours than the interior blocks
+        'perimeter': blocks that touch the outer boundary of the assembly, also
+                     only at a vertex (e.g. starfish/p6: frame of 30 blocks for
+                     n = 3 as in the paper; 'boundary' gives only the 18 blocks
+                     with an edge on the boundary)
+        list:        block indices
+    '''
     if isinstance(frame_blocks, str):
-        if frame_blocks != 'boundary':
-            raise ValueError(f"Unknown frame_blocks: {frame_blocks}")
-        deg = np.array([len(s) for s in neighbours(n_blocks, elements)])
-        return sorted(np.where(deg < deg.max())[0].tolist())
+        if frame_blocks == 'boundary':
+            deg = np.array([len(s) for s in neighbours(n_blocks, elements)])
+            return sorted(np.where(deg < deg.max())[0].tolist())
+        if frame_blocks == 'perimeter':
+            return perimeter_blocks(blocks, coverage)
+        raise ValueError(f"Unknown frame_blocks: {frame_blocks}")
     return sorted(int(i) for i in frame_blocks)
+
+
+def perimeter_blocks(blocks, coverage, tol=1e-6):
+    '''blocks with a vertex on a contact face without any contact (outer boundary)'''
+    pts = []
+    for bl, cov in zip(blocks, coverage):
+        cf = np.asarray(bl.face_groups['contact_faces'], dtype=int)
+        for f in cf[cov <= 1e-9]:
+            pts.append(bl.nodes[bl.cells_2D[f]])
+    if not pts:
+        return []
+    tree = cKDTree(np.vstack(pts))
+    return [ib for ib, bl in enumerate(blocks)
+            if np.isfinite(tree.query(bl.nodes, distance_upper_bound=tol)[0]).any()]
 
 
 def prepare_contacts(blocks, opts):
@@ -155,7 +181,7 @@ def prepare_contacts(blocks, opts):
     coverage = contact_coverage(blocks, elements)
 
     if opts['support'] == 'frame':
-        frame = select_frame(len(blocks), elements, opts['frame_blocks'])
+        frame = select_frame(len(blocks), elements, opts['frame_blocks'], blocks, coverage)
     else:
         frame = []
     frame_set = set(frame)
@@ -249,6 +275,10 @@ def solve_contacts(blocks, contacts, opts, info, tol_res=1e-6):
     else:
         lam = w * mu
     res_norm = np.linalg.norm(J @ lam + f_ext)
+    # contact force of every column (element or support), e.g. for the load
+    # transfer onto the frame (scripts/planar/frame_load.py)
+    contacts['lam'] = lam
+    contacts['columns'] = columns
 
     res_rel = res_norm / np.linalg.norm(f_ext)
     info['res_norm'] = res_norm
@@ -284,7 +314,38 @@ def solve_contacts(blocks, contacts, opts, info, tol_res=1e-6):
         bl.solutions['lam'] = lam_f
         bl.solutions['Contact pressure'] = lam_f / bl.face_areas[cf[in_contact]] if len(lam_f) else lam_f
 
+    store_contact_regions(blocks, contacts, columns, lam)
+
     return lam
+
+
+def store_contact_regions(blocks, contacts, columns, lam):
+    '''
+    Contact regions for the plots: polygon and pressure (force / area) of
+    every contact element and support, per block. In contrast to the face
+    values ('Contact pressure', averaged over the whole face) the pressure is
+    not diluted on faces that are only partially in contact (e.g. octahedra).
+    Stored as bl.solutions['contact_regions'] = (list of polygons, pressures)
+    and bl.solutions['face_coverage'] = {face: fraction in contact}.
+    '''
+    el = contacts['elements']
+    regions = [([], []) for _ in blocks]
+    covered = [dict() for _ in blocks]
+    for (kind, k), l in zip(columns, lam):
+        if kind == 'el':
+            poly, area = np.asarray(el['vertices'][k]), el['area'][k]
+            sides = ((el['a'][k], el['fa'][k]), (el['b'][k], el['fb'][k]))
+        else:
+            ib, f, area = contacts['supports'][k][:3]
+            poly = blocks[ib].nodes[blocks[ib].cells_2D[f]]
+            sides = ((ib, f),)
+        for ib, f in sides:
+            regions[ib][0].append(poly)
+            regions[ib][1].append(l / area)
+            covered[ib][f] = covered[ib].get(f, 0.) + area
+    for ib, bl in enumerate(blocks):
+        bl.solutions['contact_regions'] = (regions[ib][0], np.array(regions[ib][1]))
+        bl.solutions['face_coverage'] = {f: a / bl.face_areas[f] for f, a in covered[ib].items()}
 
 
 ############################################################################

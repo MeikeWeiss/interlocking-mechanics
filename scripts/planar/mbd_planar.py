@@ -24,10 +24,10 @@ from src.engine.util import makeDirIfNotExists, save_to_json
 # h_list = [np.sqrt(2)/2, 7*np.sqrt(2)/16, 6*np.sqrt(2)/16, 5*np.sqrt(2)/16,
 #           np.sqrt(2)/4, 3*np.sqrt(2)/16, np.sqrt(2)/8, np.sqrt(2)/16]
 
-# Für Octahedron:
-h_list = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+# Für Octahedron (h = behaltener Anteil der Höhe, fracs des CIRP-Papers):
+h_list = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
 
-PARAMETRIZED_BLOCKS = ('versatile_param', 'bisquare_param', 'irr_octahedron')
+from src.blocks.planar_block.geometry import PARAMETRIZED_BLOCKS  # noqa: E402
 
 
 # ============================================================================
@@ -35,21 +35,25 @@ PARAMETRIZED_BLOCKS = ('versatile_param', 'bisquare_param', 'irr_octahedron')
 # ============================================================================
 
 def get_run_name(block_type, group_name, bvp, ref, n_blocks, m_blocks, h_value=None,
-                 support='implicit', objective='force'):
-    '''name of the output folder of a run'''
+                 support='implicit', objective='pressure'):
+    '''
+    name of the output folder of a run:
+        <block>_<group>_<bvp>_<ref>_<n>x<m>[_h<h>][_frame][_force]
+    (suffixes only for the non-default options)
+    '''
     name = f"{block_type}_{group_name}_{bvp}_{ref}_{n_blocks}x{m_blocks}"
     if h_value is not None and block_type in PARAMETRIZED_BLOCKS:
         name += f"_h{h_value:.3f}"
     if support != 'implicit':
         name += f"_{support}"
-    if objective != 'force':
+    if objective != 'pressure':
         name += f"_{objective}"
     return name
 
 
 def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=None,
         ref=None, bvp='ceiling', out_dir_override=None, mode='force_equilibrium',
-        support=None, objective=None, contact_method=None):
+        support=None, objective=None, contact_method=None, frame_blocks=None):
     """
     Run a single simulation. Arguments that are None are taken from config.py.
 
@@ -57,6 +61,8 @@ def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=
     support:        'implicit' or 'frame' (see config.py)
     objective:      'pressure' (default) or 'force'
     contact_method: 'intersection' or 'matching'
+    frame_blocks:   'boundary', 'perimeter' or list of indices (only with support='frame');
+                    default from config.py, for group 'p6' (starfish) 'perimeter'
     """
     # local copies: the configuration in config.py is not modified
     b_conf = copy.deepcopy(block_config)
@@ -72,6 +78,9 @@ def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=
         b_conf['h'] = h_value
     if b_conf['type'] not in PARAMETRIZED_BLOCKS:
         b_conf['h'] = None
+    elif b_conf['type'] == 'octahedron' and b_conf['h'] is None:
+        # default: full octahedron (not cut)
+        b_conf['h'] = 1.0
 
     if group_name is not None:
         a_conf['group'] = group_name
@@ -85,13 +94,21 @@ def run(h_value=None, block_type=None, group_name=None, n_blocks=None, m_blocks=
         a_conf['objective'] = objective
     if contact_method is not None:
         a_conf['contact_method'] = contact_method
+    if frame_blocks is not None:
+        a_conf['frame_blocks'] = frame_blocks
+    elif a_conf['group'] == 'p6':
+        # frame of the paper: all blocks touching the boundary (30 for n = 3)
+        a_conf['frame_blocks'] = 'perimeter'
+    if a_conf['group'] == 'p6':
+        # hexagon of side n, m is not used
+        a_conf['m'] = a_conf['n']
     if a_conf.get('contact_method') == 'matching' and objective is None:
         # the original method supports only the original objective
         a_conf['objective'] = 'force'
 
     name = get_run_name(b_conf['type'], a_conf['group'], bvp, b_conf['refinement'],
                         a_conf['n'], a_conf['m'], b_conf['h'],
-                        a_conf.get('support', 'implicit'), a_conf.get('objective', 'force'))
+                        a_conf.get('support', 'implicit'), a_conf.get('objective', 'pressure'))
 
     if out_dir_override:
         o_conf['out_dir'] = out_dir_override
@@ -143,16 +160,15 @@ if __name__ == '__main__':
     # 1. Nicht-parametrisierter Block (kein h)
     #run(block_type='versatile', group_name='p4', n_blocks=4, m_blocks=4)
 
-    # Oktaeder: Seitenflächen nur teilweise im Kontakt -> Rahmen als Auflager
-    #run(block_type='octahedron', group_name='octa', n_blocks=6, m_blocks=6, ref=3, support='frame')
-
     # 2. Parametrisierter Block (mit h)
-    #run(block_type='irr_octahedron', h_value=0.7, group_name='irr_octa', n_blocks=6, m_blocks=6, ref=4, support='frame')
+    # Abgeschnittenes Oktaeder (h = behaltener Anteil der Höhe, 1 = volles Oktaeder):
+    # Seitenflächen nur teilweise im Kontakt -> Rahmen als Auflager
+    #run(block_type='octahedron', h_value=0.5, group_name='octa', n_blocks=6, m_blocks=6, ref=4, support='frame')
 
     #run(block_type='versatile_param', h_value=np.sqrt(2)/2, group_name='p4', n_blocks=6, m_blocks=6,ref=4)
 
     # 3. H-Sweep für parametrisierte Blöcke
-    #h_sweep(block_type='irr_octahedron', group_name='irr_octa', n_blocks=6, m_blocks=6, h_values=h_list, ref=4, support='frame')
+    #h_sweep(block_type='octahedron', group_name='octa', n_blocks=6, m_blocks=6, h_values=h_list, ref=4, support='frame')
 
     # 4. H-Sweep für Versatile
     #h_sweep(
@@ -163,6 +179,13 @@ if __name__ == '__main__':
     #    m_blocks=4,
     #    ref=4
     #)
+
+    # Starfish (p6): Sechseck mit Seitenlänge n = 2 (24 Blöcke) im starren Rahmen wie Versatile;
+    # identisch zu den 24 inneren Blöcken + 30 festen Rahmenblöcken des Papers (n = 3, support='frame').
+    # h = d / 20 mm (d = 1 ... 18.5 mm im Paper)
+    #run(block_type='starfish', h_value=8/20, group_name='p6', n_blocks=2, ref=3)
+    #h_sweep(block_type='starfish', group_name='p6', n_blocks=2, ref=3,
+    #        h_values=[d / 20 for d in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 18.5)])
 
     # 5. Interlocking-Test
     #run(block_type='versatile', group_name='p4', n_blocks=4, m_blocks=4, mode='interlocking_test')

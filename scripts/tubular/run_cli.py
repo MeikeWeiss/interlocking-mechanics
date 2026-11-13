@@ -16,6 +16,8 @@ and the given parameters are set exactly like in the paper scripts
     amplitude, frequency, shift, inout     (sinus block only)
     n_t, n_h                               (sinus mesh; default n_t = 2*(t//3) as in the
                                             BVP study; n_l follows from n and f as in the paper)
+    n_t, n_l                               (hexagon mesh; default as in the BVP study:
+                                            n_t = 2*(t//3), n_l = 160//n)
     lp_method    interlocking test: 'cone_mechanism' (complete test) or
                  'mechanism_test' (as in the paper)
     plots        True/False
@@ -70,6 +72,9 @@ def configure(params):
         name = (f"sinus_{params['bvp']}_n{b['n']}_t{b['t']}_sh{b['shift']}_fr{b['frequency']}"
                 f"_a{b['amplitude']}_L{a['n_layers']}")
     else:
+        # mesh as in the BVP study of the paper (analysis_hexagon/mbd_bvp.py)
+        b['n_t'] = int(params.get('n_t', 2 * (b['t'] // 3)))
+        b['n_l'] = int(params.get('n_l', 160 // b['n']))
         name = f"hexagon_{params['bvp']}_n{b['n']}_t{b['t']}_L{a['n_layers']}"
 
     p = cfg.plot_config

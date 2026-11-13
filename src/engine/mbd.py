@@ -714,7 +714,14 @@ def cone_interlocking_test(B, n_fixed=1, dof_per_body=6, tol=1e-8):
     x = cp.Variable(n_free)
     g = Bf @ x
     prob = cp.Problem(cp.Maximize(cp.sum(g)), [g >= 0, g <= 1, x <= 1, x >= -1])
-    prob.solve(solver=cp.CLARABEL)
+    # CLARABEL fails for some degenerate LPs (e.g. starfish with d = 0): then
+    # the LP is solved with HiGHS (SCIPY), which is a simplex/IPM LP solver
+    for solver in (cp.CLARABEL, cp.SCIPY):
+        try:
+            prob.solve(solver=solver)
+            break
+        except cp.error.SolverError as exc:
+            print(f"cone test: solver {solver} failed ({exc}), trying the next one")
     if prob.status not in ["optimal", "optimal_inaccurate"]:
         return False, None, {'nullity': nullity, 'lp_value': None}, prob.status
     lp_value = float(prob.value)
